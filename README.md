@@ -23,11 +23,11 @@ Technically speaking, this is accomplished by locally hosting a middleman SSL se
 > While this program is safer than the popular `inetcpl.cpl` alternate method (explained below), it is important to note that this is still a **very unsafe** way of communicating sensitive (login) data to a server and should merely be used as a temporary workaround for those that desperately require the above listed services, hence why the word "fixing" was put in quotes in the first paragraph - a proper fix would be for the maintainers of the TMF Web Services to renew its certificates and employ better security practices overall.
 
 ## Usage
-1. Head over to [Releases](https://github.com/brokenphilip/OMSIPresence/releases) and download the latest `TMFWSI.zip`
-2. Extract the ZIP wherever you'd like
+1. Head over to [Releases](https://github.com/brokenphilip/TMFWSI/releases) and download the latest `TMFWSI.zip`
+2. Extract the the contents of the zip archive wherever you'd like
 3. When you need to access `ws.trackmania.com`, simply run the program
    - TrackMania Nations/United Forever, as well as some web browsers, will need to be restarted first
-4. Whenever you're done, close the program
+4. Whenever you're done, simply close the program
 
 ## Troubleshooting
 If you encounter any issues during installation or usage, please refer to the [issue tracker](https://github.com/brokenphilip/TMFWSI/issues?q=). If you haven't found your issue, feel free to create a new one. If you have any further questions about the project, or if (understandably) using the issue tracker is too confusing, feel free to add me on Discord (`brokenphilip`) and I will try to get back to you as soon as possible. :)
@@ -65,6 +65,6 @@ If you wish to visit Manialinks instead, for example `freezone:servers`, you wil
 1. Taking a screenshot and typing it out manually,
 2. Taking a screenshot and using an OCR to extract text from the image,
 3. Using Cheat Engine to search for the `https://ws.trackmania.com/oauth2/authorize` string (UTF-8 or UTF-16, both should work), adding it to the list, and extending the length until the entire URL is revealed, or
-4. **The easiest method**: using Cheat Engine with the provided cheat tables for Nations (todo) and United (todo).
+4. **The easiest method**: using Cheat Engine with the provided cheat tables for ~~Nations (todo) and~~ [United](https://github.com/brokenphilip/TMFWSI/blob/main/ManialinkUnited.CT).
 
 Using Cheat Engine in this regard is perfectly safe, but make sure not to use it with conflicting software (while the Competition Patch is running, for example). After you've extracted the URL, follow step 3 onwards.
