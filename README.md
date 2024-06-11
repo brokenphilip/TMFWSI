@@ -14,7 +14,7 @@ By doing so, this allows you to log-in to the following services:
 - [freezone:servers](http://dedicp.maniastudio.com/) Manialink, to manage your FreeZone servers
 - any other website or Manialink not listed here that uses `ws.trackmania.com` for authentication
 
-Technically speaking, this is accomplished by locally hosting a middleman SSL server using [httplib](https://github.com/yhirose/cpp-httplib) and [OpenSSL](https://github.com/openssl/openssl), modifying your computer's `hosts` file to point to it, and using [cURL](https://github.com/curl/curl) with the necessary parameters to establish a connection to the TMF Web Services by skipping certificate revocation checks - as this is all done locally on your machine, no data gets sent anywhere else.
+Technically speaking, this is accomplished by locally hosting a middleman SSL server using [httplib](https://github.com/yhirose/cpp-httplib) and [OpenSSL](https://github.com/openssl/openssl), modifying your computer's `hosts` file to point to it, and using [cURL](https://github.com/curl/curl) (alongside [zlib](https://github.com/madler/zlib)) with the necessary parameters to establish a connection to the TMF Web Services by skipping certificate revocation checks - as this is all done locally on your machine, no data gets sent anywhere else.
 
 > [!WARNING]
 > It is possible to repurpose this project to host a public server rather than a local one, but hosting and **especially** connecting to one is ill-advised because the host can easily read the communicated data, which is an obvious security hazard - you should only self-host TMFWSI, and the project is designed in such a way to make this process as easy as possible.
