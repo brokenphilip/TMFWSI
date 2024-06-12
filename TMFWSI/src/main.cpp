@@ -10,7 +10,7 @@
 
 #define myprint(stream) std::cout << stream << std::endl
 #define end(status) do { myprint("# TMFWSI is shutting down... Status: " << (status? "FAIL" : "OK")); \
-        X509_free(x509); EVP_PKEY_free(pkey); curl_easy_cleanup(curl); return status; } while (false) \
+        X509_free(x509); EVP_PKEY_free(pkey); curl_easy_cleanup(g::curl); return status; } while (false) \
 
 #define TMFWSI "TrackMania Forever Web Services Interceptor"
 #define TMFWSI_VERSION "1.0"
@@ -22,16 +22,39 @@
 #define HOSTS           HOSTS_PATH "hosts"
 #define BACKUP_FILE     HOSTS_PATH "hosts.tmfwsi_bak"
 
-httplib::SSLServer* server = nullptr;
-bool server_stopped = false;
+namespace g
+{
+    CURL* curl = nullptr;
+
+    httplib::SSLServer* server = nullptr;
+    bool server_stopped = false;
+}
+
+namespace ws
+{
+    void authorize(const httplib::Request& request, httplib::Response& response)
+    {
+        myprint("# Got something.");
+
+        //curl_easy_reset(g::curl);
+
+        response.set_content(
+            "<?xml version='1.0' encoding='utf-8' ?>"
+            "<maniacode noconfirmation=\"1\">"
+            "<show_message><message>meow :3</message></show_message>"
+            "</maniacode>", "text/plain");
+
+        //curl_easy_setopt(g::curl, CURLOPT_URL, );
+    }
+}
 
 int __stdcall handle_console(unsigned long ctrl)
 {
-    if (!server_stopped && (ctrl == CTRL_C_EVENT || ctrl == CTRL_CLOSE_EVENT))
+    if (!g::server_stopped && (ctrl == CTRL_C_EVENT || ctrl == CTRL_CLOSE_EVENT))
     {
-        server_stopped = true;
+        g::server_stopped = true;
         myprint("# Close or CTRL+C event received - stopping server...");
-        server->stop();
+        g::server->stop();
         return 1;
     }
 
@@ -52,13 +75,30 @@ void handle_errors()
     }
 }
 
+void hosts_help()
+{
+    myprint("# -----");
+    myprint("# To manually modify your '" HOSTS "' file, add the following line using a text editor, without the quotes:");
+    myprint("# '" ADDRESS " ws.trackmania.com'");
+    myprint("# This will redirect all traffic directed towards 'ws.trackmania.com' to this local address - it is required for TMFWSI to function properly.");
+    myprint("# However, if this entry is left in the 'hosts' file and TMFWSI is not running, all traffic to 'ws.trackmania.com' will effectively be 'blocked'.");
+    myprint("# TMFWSI attempts to automate this process - if successful, it will modify the 'hosts' file accordingly on startup and on application shutdown.");
+    myprint("# Please note that, should you decide to add this entry manually, it will be detected by TMFWSI on startup and will not be automatically removed.");
+    myprint("# -----");
+}
+
 int main()
 {
+    SetConsoleTitleA(TMFWSI " " TMFWSI_VERSION);
+
+    myprint("# -----");
     myprint("# " TMFWSI " " TMFWSI_VERSION " by brokenphilip");
     myprint("# Compiled with 'cURL " << curl_version_info(CURLVERSION_NOW)->version << "', '" OPENSSL_VERSION_TEXT "' and 'zlib " ZLIB_VERSION "'.");
+    myprint("# For more information and troubleshooting, please visit: https://github.com/brokenphilip/TMFWSI");
+    myprint("# -----");
 
-    auto curl = curl_easy_init();
-    if (!curl)
+    g::curl = curl_easy_init();
+    if (!g::curl)
     {
         myprint("# Failed to initialize cURL!");
         return 1;
@@ -70,8 +110,9 @@ int main()
     if (!pkey)
     {
         myprint("# Error: Failed to generate RSA key pair!");
+
         myprint("# TMFWSI is shutting down... Status: FAIL");
-        curl_easy_cleanup(curl);
+        curl_easy_cleanup(g::curl);
         return 1;
     }
 
@@ -80,9 +121,10 @@ int main()
     {
         myprint("# Error: Failed to generate X509 certificate structure! The following errors occurred:");
         handle_errors();
+
         myprint("# TMFWSI is shutting down... Status: FAIL");
         EVP_PKEY_free(pkey);
-        curl_easy_cleanup(curl);
+        curl_easy_cleanup(g::curl);
         return 1;
     }
 
@@ -144,71 +186,82 @@ int main()
     myprint("# SSL certificate generated.");
 
     /*
-    myprint("# Modifying 'hosts' file...");
+    myprint("# Checking 'hosts' file for existing entries of 'ws.trackmania.com'...");
 
-    myprint("# Note: Found an existing entry for 'ws.trackmania.com' which matches our address " ADDRESS " - will leave as-is on application shutdown.");
-
-    if (1)
+    if (found_ours)
     {
-        if (1)
-        {
-            myprint("# Error: Found an existing entry for 'ws.trackmania.com', but it doesn't match our address " ADDRESS "!");
-            myprint("# Either remove the entry, or manually modify it by following the steps below.");
-        }
-        else
-        {
-            myprint("# Error: Unable to modify the hosts file!");
-            myprint("# Either launch TMFWSI as admin, end conflicting programs, restart your machine, or manually modify the 'hosts' file by following the steps below.");
-        }
-
-        myprint("# -----");
-        myprint("# To manually modify your '" HOSTS "' file, add the following line using a text editor, without the quotes:");
-        myprint("# '" ADDRESS " ws.trackmania.com'");
-        myprint("# This will redirect all traffic directed towards 'ws.trackmania.com' to this local address - it is required for TMFWSI to function properly.");
-        myprint("# However, if this entry is left in the 'hosts' file and TMFWSI is not running, all traffic to 'ws.trackmania.com' will effectively be 'blocked'.");
-        myprint("# TMFWSI attempts to automate this process - if successful, it will modify the 'hosts' file accordingly on startup and on application shutdown.");
-        myprint("# Please note that, should you decide to add this entry manually, it will be detected by TMFWSI on startup and will not be automatically removed.");
-        myprint("# -----");
+        myprint("# Note: Found an existing entry which matches our address " ADDRESS " - will leave as-is on application shutdown.");
+        myprint("# It will be briefly removed and re-added after fetching the website's IP address.");
+    }
+    else if (found_elses)
+    {
+        myprint("# Error: Found an existing entry, but it doesn't match our address " ADDRESS "!");
+        myprint("# Either remove the entry, or manually modify it by following the steps below.");
+        hosts_help();
         end(1);
     }
 
-    if (1)
-    {
-        myprint("# 'Hosts' file modified - the change will be reverted on application shutdown.");
+    myprint("# 'Hosts' file checked - no existing entries.");
 
+    myprint("# Fetching IP address of 'ws.trackmania.com'...");
+
+    myprint("# Fetched: '" << ip << "'.");
+
+    myprint("# Backing up the 'hosts' file...");
+
+    if (backup_created)
+    {
         myprint("# A backup file '" BACKUP_FILE "' has been created.");
+    }
+    else
+    {
         myprint("# Warning: failed to create the '" BACKUP_FILE "' backup file!");
+    }
+
+    myprint("# Modifying 'hosts' file...");
+
+    if (modified)
+    {
+        if (found_ours)
+        {
+            myprint("# 'Hosts' file modified - re-added previous entry.");
+        }
+        else
+        {
+            myprint("# 'Hosts' file modified - the change will be reverted on application shutdown.");
+        }
+    }
+    else
+    {
+        myprint("# Error: Unable to modify the hosts file!");
+        // get error
+        myprint("# Either launch TMFWSI as admin, end conflicting programs, restart your machine, or manually modify the 'hosts' file by following the steps below.");
+        hosts_help();
+        end(1);
     }
     */
 
     myprint("# Starting SSL server...");
-    server = new httplib::SSLServer(x509, pkey);
+    g::server = new httplib::SSLServer(x509, pkey);
     SetConsoleCtrlHandler(&handle_console, 1);
 
-    server->Get("/oauth2/authorize/", [](const httplib::Request&, httplib::Response& res)
-    {
-        myprint("# Got something.");
-        res.set_content(
-            "<?xml version='1.0' encoding='utf-8' ?>"
-            "<maniacode noconfirmation=\"1\">"
-            "<show_message><message>meow :3</message></show_message>"
-            "</maniacode>", "text/plain");
-    });
-
-    if (!server->bind_to_port(ADDRESS, 443))
+    if (!g::server->bind_to_port(ADDRESS, 443))
     {
         myprint("# Error: Failed to bind to address " ADDRESS ":443 - make sure it is not in use!");
+
         SetConsoleCtrlHandler(&handle_console, 0);
-        delete server;
+        delete g::server;
         end(1);
     }
 
+    g::server->Get("/oauth2/authorize/", ws::authorize);
+
     myprint("# SSL Server started - listening to " ADDRESS ":443...");
 
-    int status = server->listen_after_bind() ? 0 : 1;
+    int status = g::server->listen_after_bind() ? 0 : 1;
     if (!status)
     {
-        if (server_stopped)
+        if (g::server_stopped)
         {
             myprint("# Server has been stopped.");
             status = 0;
@@ -220,22 +273,24 @@ int main()
     }
 
     SetConsoleCtrlHandler(&handle_console, 0);
-    delete server;
+    delete g::server;
 
     /*
-    if (1)
+    myprint("# Reverting 'hosts' file...");
+
+    if (reverted)
     {
-        myprint("# Reverting 'hosts' file...");
-
-        if (1)
-        {
-            myprint("# Warning: failed to revert '" HOSTS "' file! Restore from the backup file '" BACKUP_FILE "' if present, or remove the following entry:");
-            myprint("# '" ADDRESS " ws.trackmania.com'");
-            myprint("# You may leave this entry in, but traffic to 'ws.trackmania.com' will be blocked if TMFWSI is not running, and it will NOT be removed on startup.");
-        }
-
         myprint("# 'Hosts' file reverted.");
     }
+    else
+    {
+        myprint("# Warning: failed to revert '" HOSTS "' file!");
+        // error
+        myprint("Restore from the backup file '" BACKUP_FILE "' if present, or, ideally, remove the following entry:");
+        myprint("# '" ADDRESS " ws.trackmania.com'");
+        myprint("# It's safe to leave this entry in, but traffic to 'ws.trackmania.com' will be blocked if TMFWSI is not running, and it will NOT be removed on startup.");
+    }
+    
     */
     end(status);
 }
