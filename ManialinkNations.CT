@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CheatTable CheatEngineTableVersion="29">
+  <CheatEntries>
+    <CheatEntry>
+      <ID>14</ID>
+      <Description>"Manialink URL"</Description>
+      <LastState RealAddress="03AC55DA"/>
+      <VariableType>String</VariableType>
+      <Length>512</Length>
+      <Unicode>1</Unicode>
+      <CodePage>0</CodePage>
+      <ZeroTerminate>1</ZeroTerminate>
+      <Address>D68C44</Address>
+      <Offsets>
+        <Offset>0</Offset>
+        <Offset>4C</Offset>
+        <Offset>10c</Offset>
+      </Offsets>
+    </CheatEntry>
+  </CheatEntries>
+  <UserdefinedSymbols/>
+</CheatTable>
