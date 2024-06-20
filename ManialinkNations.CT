@@ -4,7 +4,6 @@
     <CheatEntry>
       <ID>14</ID>
       <Description>"Manialink URL"</Description>
-      <LastState RealAddress="03AC55DA"/>
       <VariableType>String</VariableType>
       <Length>512</Length>
       <Unicode>1</Unicode>
