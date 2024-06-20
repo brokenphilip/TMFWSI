@@ -65,6 +65,6 @@ If you wish to visit Manialinks instead, for example `freezone:servers`, you wil
 1. Taking a screenshot and typing it out manually,
 2. Taking a screenshot and using an OCR to extract text from the image,
 3. Using Cheat Engine to search for the `https://ws.trackmania.com/oauth2/authorize` string (UTF-8 or UTF-16, both should work), adding it to the list, and extending the length until the entire URL is revealed, or
-4. **The easiest method**: using Cheat Engine with the provided cheat tables for [Nations](https://github.com/brokenphilip/TMFWSI/blob/main/ManialinkNations.CT) or [United](https://github.com/brokenphilip/TMFWSI/blob/main/ManialinkUnited.CT).
+4. **The easiest method**: using Cheat Engine with the provided cheat tables for [Nations](https://github.com/brokenphilip/TMFWSI/blob/main/ManialinkNations.CT) or [United](https://github.com/brokenphilip/TMFWSI/blob/main/ManialinkUnited.CT) - these cheat tables use static pointers (globals) and offsets to automatically find the URL in memory, no searching necessary
 
 Using Cheat Engine in this regard is perfectly safe, but make sure not to use it with conflicting software (while the Competition Patch is running, for example). After you've extracted the URL, follow step 3 onwards.
