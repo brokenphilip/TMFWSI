@@ -24,6 +24,12 @@
  *
  ***************************************************************************/
 
+// brokenphilip/TMFWSI
+#ifdef  __cplusplus
+extern "C" {
+#endif
+// brokenphilip/TMFWSI
+
 struct curl_header {
   char *name;    /* this might not use the same case */
   char *value;
@@ -62,5 +68,11 @@ CURL_EXTERN struct curl_header *curl_easy_nextheader(CURL *easy,
                                                      unsigned int origin,
                                                      int request,
                                                      struct curl_header *prev);
+
+// brokenphilip/TMFWSI
+#ifdef  __cplusplus
+}
+#endif
+// brokenphilip/TMFWSI
 
 #endif /* CURLINC_HEADER_H */

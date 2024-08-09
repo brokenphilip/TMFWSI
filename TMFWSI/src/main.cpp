@@ -1,4 +1,5 @@
 #include <iostream>
+#include <filesystem>
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "../ext/httplib.h"
@@ -16,7 +17,7 @@
 #define TMFWSI_VERSION "1.0"
 
 // 127 :3c
-#define ADDRESS "127.58.51.99"
+#define DEFAULT_ADDRESS "127.58.51.99"
 
 #define HOSTS_PATH      "%SystemRoot%\\system32\\drivers\\etc\\"
 #define HOSTS           HOSTS_PATH "hosts"
@@ -30,22 +31,101 @@ namespace g
     bool server_stopped = false;
 }
 
-namespace ws
+void handle_get(const httplib::Request& request, httplib::Response& response)
 {
-    void authorize(const httplib::Request& request, httplib::Response& response)
+    // TODO: more detailed, optionally verbose, output
+    myprint("# Request received...");
+
+    // First, let's build our URL, making sure to include the query string
+    bool first = true;
+    std::string params;
+    for (auto& it : request.params)
     {
-        myprint("# Got something.");
-
-        //curl_easy_reset(g::curl);
-
-        response.set_content(
-            "<?xml version='1.0' encoding='utf-8' ?>"
-            "<maniacode noconfirmation=\"1\">"
-            "<show_message><message>meow :3</message></show_message>"
-            "</maniacode>", "text/plain");
-
-        //curl_easy_setopt(g::curl, CURLOPT_URL, );
+        params += (first ? "?" : "&");
+        params += it.first;
+        params += "=";
+        params += it.second;
+        first = false;
     }
+
+    // TODO: fetch IP dynamically, before hosts is set
+    std::string url = "https://178.33.106.156" + request.path + params;
+    curl_easy_setopt(g::curl, CURLOPT_URL, url.c_str());
+
+    /////myprint("# URL: " << url);
+
+    /////myprint("# HEADER START");
+
+    // Next, fetch the request headers
+    // User-Agent in particular is very important - for reference, TMF uses "GameBox" and MP uses "ManiaPlanet" for their in-game Manialink browsers
+    curl_slist* slist = nullptr;
+    for (auto& it : request.headers)
+    {
+        std::string tag = it.first + ":" + it.second;
+        curl_slist_append(slist, tag.c_str());
+
+        /////std::cout << tag << std::endl;
+    }
+    if (slist)
+    {
+        curl_easy_setopt(g::curl, CURLOPT_HTTPHEADER, slist);
+    }
+
+    /////myprint("# HEADER END");
+
+    // Do not check for certificates, as they're expired anyways (which is what we're trying to work around in the first place lol)
+    curl_easy_setopt(g::curl, CURLOPT_SSL_VERIFYPEER, false);
+
+    // Save the result for later
+    std::string data;
+    curl_easy_setopt(g::curl, CURLOPT_WRITEFUNCTION, +[](void* buffer, size_t size, size_t n_items, std::string* data)
+    {
+        data->append(static_cast<char*>(buffer), size * n_items);
+        return size * n_items;
+    });
+    curl_easy_setopt(g::curl, CURLOPT_WRITEDATA, &data);
+
+    CURLcode res = curl_easy_perform(g::curl);
+    if (res)
+    {
+        myprint("# Error: " << curl_easy_strerror(res) << " (" << res << ")");
+    }
+    else
+    {
+        // Set the HTTP code
+        curl_easy_getinfo(g::curl, CURLINFO_RESPONSE_CODE, &response.status);
+
+        // Set the content to the result we saved earlier
+        response.body = data;
+
+        /////myprint("# DATA START");
+        /////std::cout << data << std::endl;
+        /////myprint("# DATA END");
+        /////
+        /////myprint("# HEADER START");
+
+        // Set the headers
+        curl_header* prev = nullptr;
+        curl_header* header = nullptr;
+        while ((header = curl_easy_nextheader(g::curl, CURLH_HEADER, 0, prev)))
+        {
+            /////std::cout << header->name << ":" << header->value << std::endl;
+
+            response.set_header(header->name, header->value);
+            prev = header;
+        }
+
+        /////myprint("# HEADER END");
+
+        myprint("# Success!");
+    }
+
+    // Done :3
+    if (slist)
+    {
+        curl_slist_free_all(slist);
+    }
+    curl_easy_reset(g::curl);
 }
 
 int __stdcall handle_console(unsigned long ctrl)
@@ -61,7 +141,7 @@ int __stdcall handle_console(unsigned long ctrl)
     return 0;
 }
 
-void handle_errors()
+void handle_openssl_errors()
 {
     unsigned long e = 0L;
 
@@ -75,16 +155,36 @@ void handle_errors()
     }
 }
 
+// TODO: is hosts_help obsolete?
 void hosts_help()
 {
     myprint("# -----");
     myprint("# To manually modify your '" HOSTS "' file, add the following line using a text editor, without the quotes:");
-    myprint("# '" ADDRESS " ws.trackmania.com'");
+    myprint("# '" DEFAULT_ADDRESS " ws.trackmania.com'");
     myprint("# This will redirect all traffic directed towards 'ws.trackmania.com' to this local address - it is required for TMFWSI to function properly.");
     myprint("# However, if this entry is left in the 'hosts' file and TMFWSI is not running, all traffic to 'ws.trackmania.com' will effectively be 'blocked'.");
     myprint("# TMFWSI attempts to automate this process - if successful, it will modify the 'hosts' file accordingly on startup and on application shutdown.");
     myprint("# Please note that, should you decide to add this entry manually, it will be detected by TMFWSI on startup and will not be automatically removed.");
     myprint("# -----");
+}
+
+void demo_perms(std::filesystem::perms p)
+{
+    using std::filesystem::perms;
+    auto show = [=](char op, perms perm)
+    {
+        std::cout << (perms::none == (perm & p) ? '-' : op);
+    };
+    show('r', perms::owner_read);
+    show('w', perms::owner_write);
+    show('x', perms::owner_exec);
+    show('r', perms::group_read);
+    show('w', perms::group_write);
+    show('x', perms::group_exec);
+    show('r', perms::others_read);
+    show('w', perms::others_write);
+    show('x', perms::others_exec);
+    std::cout << '\n';
 }
 
 int main()
@@ -100,7 +200,9 @@ int main()
     g::curl = curl_easy_init();
     if (!g::curl)
     {
-        myprint("# Failed to initialize cURL!");
+        myprint("# Error: Failed to initialize cURL!");
+
+        myprint("# TMFWSI is shutting down... Status: FAIL");
         return 1;
     }
 
@@ -120,7 +222,7 @@ int main()
     if (!x509)
     {
         myprint("# Error: Failed to generate X509 certificate structure! The following errors occurred:");
-        handle_errors();
+        handle_openssl_errors();
 
         myprint("# TMFWSI is shutting down... Status: FAIL");
         EVP_PKEY_free(pkey);
@@ -185,78 +287,31 @@ int main()
 
     myprint("# SSL certificate generated.");
 
-    /*
-    myprint("# Checking 'hosts' file for existing entries of 'ws.trackmania.com'...");
+    // TODO: CertAddCertificateContextToStore
 
-    if (found_ours)
-    {
-        myprint("# Note: Found an existing entry which matches our address " ADDRESS " - will leave as-is on application shutdown.");
-        myprint("# It will be briefly removed and re-added after fetching the website's IP address.");
-    }
-    else if (found_elses)
-    {
-        myprint("# Error: Found an existing entry, but it doesn't match our address " ADDRESS "!");
-        myprint("# Either remove the entry, or manually modify it by following the steps below.");
-        hosts_help();
-        end(1);
-    }
-
-    myprint("# 'Hosts' file checked - no existing entries.");
-
-    myprint("# Fetching IP address of 'ws.trackmania.com'...");
-
-    myprint("# Fetched: '" << ip << "'.");
-
-    myprint("# Backing up the 'hosts' file...");
-
-    if (backup_created)
-    {
-        myprint("# A backup file '" BACKUP_FILE "' has been created.");
-    }
-    else
-    {
-        myprint("# Warning: failed to create the '" BACKUP_FILE "' backup file!");
-    }
-
-    myprint("# Modifying 'hosts' file...");
-
-    if (modified)
-    {
-        if (found_ours)
-        {
-            myprint("# 'Hosts' file modified - re-added previous entry.");
-        }
-        else
-        {
-            myprint("# 'Hosts' file modified - the change will be reverted on application shutdown.");
-        }
-    }
-    else
-    {
-        myprint("# Error: Unable to modify the hosts file!");
-        // get error
-        myprint("# Either launch TMFWSI as admin, end conflicting programs, restart your machine, or manually modify the 'hosts' file by following the steps below.");
-        hosts_help();
-        end(1);
-    }
-    */
+    // TODO: check and modify hosts file
+    //myprint("# 'hosts' file permissions: ");
+    //demo_perms(std::filesystem::status(HOSTS).permissions());
+    //myprint("# 'etc' folder permissions: ");
+    //demo_perms(std::filesystem::status(HOSTS_PATH).permissions());
 
     myprint("# Starting SSL server...");
     g::server = new httplib::SSLServer(x509, pkey);
     SetConsoleCtrlHandler(&handle_console, 1);
 
-    if (!g::server->bind_to_port(ADDRESS, 443))
+    if (!g::server->bind_to_port(DEFAULT_ADDRESS, 443))
     {
-        myprint("# Error: Failed to bind to address " ADDRESS ":443 - make sure it is not in use!");
+        myprint("# Error: Failed to bind to address " DEFAULT_ADDRESS ":443 - make sure it is not in use!");
 
         SetConsoleCtrlHandler(&handle_console, 0);
         delete g::server;
         end(1);
     }
 
-    g::server->Get("/oauth2/authorize/", ws::authorize);
+    g::server->Get(R"(.*)", handle_get);
 
-    myprint("# SSL Server started - listening to " ADDRESS ":443...");
+    // TODO: custom address launch parameter
+    myprint("# SSL Server started - listening to " DEFAULT_ADDRESS ":443...");
 
     int status = g::server->listen_after_bind() ? 0 : 1;
     if (!status)
@@ -275,23 +330,7 @@ int main()
     SetConsoleCtrlHandler(&handle_console, 0);
     delete g::server;
 
-    /*
-    myprint("# Reverting 'hosts' file...");
+    // TODO: revert hosts file
 
-    if (reverted)
-    {
-        myprint("# 'Hosts' file reverted.");
-    }
-    else
-    {
-        myprint("# Warning: failed to revert '" HOSTS "' file!");
-        // error
-        myprint("Restore from the backup file '" BACKUP_FILE "' if present, or, ideally, remove the following entry:");
-        myprint("# '" ADDRESS " ws.trackmania.com'");
-        myprint("# It's safe to leave this entry in, but traffic to 'ws.trackmania.com' will be blocked if TMFWSI is not running, and it will NOT be removed on startup.");
-    }
-    
-    */
     end(status);
 }
-
