@@ -1,4 +1,4 @@
-# TrackMania Forever Web Server Interceptor
+# TrackMania Forever Web Services Interceptor
 > [!NOTE]
 > This repository is currently an **early work-in-progress**, any and all information is subject to change without notice and may be missing or incorrect.
 
