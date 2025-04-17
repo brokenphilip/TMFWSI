@@ -283,7 +283,7 @@ int main()
         if (!out.is_open())
         {
             out.close();
-            return ERROR_WRITE_PROTECT;
+            return ERROR_FILE_READ_ONLY;
         }
 
         if (!(out << "\n\n" "// " TMFWSI "\n" DEFAULT_ADDRESS "\t" "ws.trackmania.com"))
