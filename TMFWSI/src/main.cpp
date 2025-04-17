@@ -191,18 +191,18 @@ HRESULT run_tmfwsi(LPCSTR args)
 
         switch ((int)sexi.hInstApp)
         {
-            case SE_ERR_FNF: return ERROR_FILE_NOT_FOUND;
-            case SE_ERR_PNF: return ERROR_PATH_NOT_FOUND;
-            case SE_ERR_ACCESSDENIED: return ERROR_ACCESS_DENIED;
-            case SE_ERR_OOM: return ERROR_OUTOFMEMORY;
-            case SE_ERR_DLLNOTFOUND: return ERROR_DLL_NOT_FOUND;
-            case SE_ERR_SHARE: return ERROR_SHARING_VIOLATION;
+            case SE_ERR_FNF:            return ERROR_FILE_NOT_FOUND;
+            case SE_ERR_PNF:            return ERROR_PATH_NOT_FOUND;
+            case SE_ERR_ACCESSDENIED:   return ERROR_ACCESS_DENIED;
+            case SE_ERR_OOM:            return ERROR_OUTOFMEMORY;
+            case SE_ERR_DLLNOTFOUND:    return ERROR_DLL_NOT_FOUND;
+            case SE_ERR_SHARE:          return ERROR_SHARING_VIOLATION;
             //case SE_ERR_ASSOCINCOMPLETE:
-            case SE_ERR_DDETIMEOUT: return ERROR_DDE_FAIL;
-            case SE_ERR_DDEFAIL: return ERROR_DDE_FAIL;
-            case SE_ERR_DDEBUSY: return ERROR_DDE_FAIL;
-            case SE_ERR_NOASSOC: return ERROR_NO_ASSOCIATION;
-            default: return E_UNEXPECTED;
+            case SE_ERR_DDETIMEOUT:     return ERROR_DDE_FAIL;
+            case SE_ERR_DDEFAIL:        return ERROR_DDE_FAIL;
+            case SE_ERR_DDEBUSY:        return ERROR_DDE_FAIL;
+            case SE_ERR_NOASSOC:        return ERROR_NO_ASSOCIATION;
+            default:                    return E_UNEXPECTED;
         }
     }
 
