@@ -95,7 +95,7 @@ void handle_get(const httplib::Request& request, httplib::Response& response)
     CURLcode res = curl_easy_perform(g::curl);
     if (res)
     {
-        myprint("# Error: " << curl_easy_strerror(res) << " (" << res << ")");
+        myprint("# Error: " << curl_easy_strerror(res) << " (CURLcode: " << res << ")");
     }
     else
     {
@@ -433,7 +433,7 @@ int main()
         auto result = run_tmfwsi("-do-hosts");
         if (result)
         {
-            myprint("# Error: Failed to modify the 'hosts' file - " << LastError(result).Message());
+            myprint("# Error: Failed to modify the 'hosts' file - " << LastError(result).Message() << " (HRESULT: " << result << ")");
             end(1);
         }
 
@@ -486,7 +486,7 @@ int main()
         auto result = run_tmfwsi("-undo-hosts");
         if (result)
         {
-            myprint("# Error: Failed to revert the 'hosts' file - " << LastError(result).Message());
+            myprint("# Error: Failed to revert the 'hosts' file - " << LastError(result).Message() << " (HRESULT: " << result << ")");
             end(1);
         }
 
