@@ -423,19 +423,26 @@ int main()
 
     myprint("# SSL certificate generated.");
 
-    myprint("# Modifying and backing up 'hosts' file...");
+    // Disable modifying the hosts file if we have the following launch parameter
+    bool hosts_enabled = !strstr(cmdline, "-no-hosts");
 
-    if (!strstr(cmdline, "-no-hosts"))
+    if (hosts_enabled)
     {
+        myprint("# Modifying and backing up 'hosts' file...");
+
         auto result = run_tmfwsi("-do-hosts");
         if (result)
         {
             myprint("# Error: Failed to modify the 'hosts' file - " << LastError(result).Message());
             end(1);
         }
-    }
 
-    myprint("# 'hosts' file modified and backed up - it will be reverted once the program shuts down.");
+        myprint("# 'hosts' file modified and backed up - it will be reverted once the program shuts down.");
+    }
+    else
+    {
+        myprint("# Currently in 'no-hosts' mode - 'hosts' file remains unmodified.");
+    }
 
     myprint("# Starting SSL server...");
     g::server = new httplib::SSLServer(x509, pkey);
@@ -472,19 +479,19 @@ int main()
     SetConsoleCtrlHandler(&handle_console, 0);
     delete g::server;
 
-    myprint("# Reverting 'hosts' file...");
-
-    if (!strstr(cmdline, "-no-hosts"))
+    if (hosts_enabled)
     {
+        myprint("# Reverting 'hosts' file...");
+
         auto result = run_tmfwsi("-undo-hosts");
         if (result)
         {
             myprint("# Error: Failed to revert the 'hosts' file - " << LastError(result).Message());
             end(1);
         }
-    }
 
-    myprint("# 'hosts' file reverted.");
+        myprint("# 'hosts' file reverted.");
+    }
 
     end(status);
 }
