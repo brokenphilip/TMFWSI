@@ -32,14 +32,21 @@
 namespace g
 {
     CURL* curl = nullptr;
+    char ip[16] = { 0 };
 
     httplib::SSLServer* server = nullptr;
     bool server_stopped = false;
+
+    // TODO: maybe this should be a launch option?
+#if defined(_DEBUG)
+    bool debug = true;
+#else
+    bool debug = false;
+#endif
 }
 
 void handle_get(const httplib::Request& request, httplib::Response& response)
 {
-    // TODO: more detailed, optionally verbose, output
     myprint("# Request received...");
 
     // First, let's build our URL, making sure to include the query string
@@ -54,13 +61,19 @@ void handle_get(const httplib::Request& request, httplib::Response& response)
         first = false;
     }
 
-    // TODO: fetch IP dynamically, before hosts is set
-    std::string url = "https://178.33.106.156" + request.path + params;
+    std::string ip_str = g::ip;
+    std::string url = "https://" + ip_str + request.path + params;
     curl_easy_setopt(g::curl, CURLOPT_URL, url.c_str());
 
-    /////myprint("# URL: " << url);
+    // Enable cookie engine - might not do anything?
+    curl_easy_setopt(g::curl, CURLOPT_COOKIEFILE, "");
 
-    /////myprint("# HEADER START");
+    if (g::debug)
+    {
+        myprint("!! Received URL: " << url);
+
+        myprint("!! === Received Header START === ");
+    }
 
     // Next, fetch the request headers
     // User-Agent in particular is very important - for reference, TMF uses "GameBox" and MP uses "ManiaPlanet" for their in-game Manialink browsers
@@ -71,14 +84,20 @@ void handle_get(const httplib::Request& request, httplib::Response& response)
         std::string tag = it.first + ":" + it.second;
         curl_slist_append(slist, tag.c_str());
 
-        /////std::cout << tag << std::endl;
+        if (g::debug)
+        {
+            std::cout << tag << std::endl;
+        }
     }
     if (slist)
     {
         curl_easy_setopt(g::curl, CURLOPT_HTTPHEADER, slist);
     }
 
-    /////myprint("# HEADER END");
+    if (g::debug)
+    {
+        myprint("!! === Received Header END === ");
+    }
 
     // Do not check for certificates, as they're expired anyways (which is what we're trying to work around in the first place lol)
     curl_easy_setopt(g::curl, CURLOPT_SSL_VERIFYPEER, false);
@@ -105,24 +124,33 @@ void handle_get(const httplib::Request& request, httplib::Response& response)
         // Set the content to the result we saved earlier
         response.body = data;
 
-        /////myprint("# DATA START");
-        /////std::cout << data << std::endl;
-        /////myprint("# DATA END");
-        /////
-        /////myprint("# HEADER START");
+        if (g::debug)
+        {
+            myprint("!! === Sent Data START === ");
+            std::cout << data << std::endl;
+            myprint("!! === Sent Data END === ");
+            
+            myprint("!! === Sent Header START === ");
+        }
 
         // Set the headers
         curl_header* prev = nullptr;
         curl_header* header = nullptr;
         while ((header = curl_easy_nextheader(g::curl, CURLH_HEADER, 0, prev)))
         {
-            /////std::cout << header->name << ":" << header->value << std::endl;
+            if (g::debug)
+            {
+                std::cout << header->name << ":" << header->value << std::endl;
+            }
 
             response.set_header(header->name, header->value);
             prev = header;
         }
 
-        /////myprint("# HEADER END");
+        if (g::debug)
+        {
+            myprint("!! === Sent Header END === ");
+        }
 
         myprint("# Success!");
     }
@@ -341,6 +369,50 @@ int main()
         myprint("# TMFWSI is shutting down... Status: FAIL");
         return 1;
     }
+
+    myprint("# Fetching IP address of TrackMania Forever Web Services...");
+
+    curl_easy_setopt(g::curl, CURLOPT_URL, "http://ws.trackmania.com/");
+
+    // Don't write to stdout
+    curl_easy_setopt(g::curl, CURLOPT_WRITEFUNCTION, +[](void* buffer, size_t size, size_t n_items, void* unused)
+    {
+        return size * n_items;
+    });
+
+    CURLcode res = curl_easy_perform(g::curl);
+    if (res)
+    {
+        myprint("# Error: " << curl_easy_strerror(res) << " (CURLcode: " << res << ")");
+
+        myprint("# TMFWSI is shutting down... Status: FAIL");
+        curl_easy_cleanup(g::curl);
+        return 1;
+    }
+
+    char* primary_ip = nullptr;
+    res = curl_easy_getinfo(g::curl, CURLINFO_PRIMARY_IP, &primary_ip);
+    if (res)
+    {
+        myprint("# Error: " << curl_easy_strerror(res) << " (CURLcode: " << res << ")");
+
+        myprint("# TMFWSI is shutting down... Status: FAIL");
+        curl_easy_cleanup(g::curl);
+        return 1;
+    }
+
+    if (!primary_ip)
+    {
+        myprint("# Error: IP address is blank!");
+
+        myprint("# TMFWSI is shutting down... Status: FAIL");
+        curl_easy_cleanup(g::curl);
+        return 1;
+    }
+
+    myprint("# TrackMania Forever Web Services IP address: " << primary_ip);
+    strcpy_s(g::ip, primary_ip);
+    curl_easy_reset(g::curl);
 
     myprint("# Generating SSL certificate...");
 
