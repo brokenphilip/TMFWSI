@@ -208,7 +208,7 @@ HRESULT run_tmfwsi(LPCSTR args)
 
     if (!sexi.hProcess)
     {
-        return E_UNEXPECTED;
+        return ERROR_INVALID_HANDLE;
     }
 
     auto result = WaitForSingleObject(sexi.hProcess, INFINITE);
