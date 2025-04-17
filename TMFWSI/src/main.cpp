@@ -1,5 +1,6 @@
 #include <iostream>
 #include <filesystem>
+#include <fstream>
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "../ext/httplib.h"
@@ -8,6 +9,10 @@
 #include "../ext/curl/curl.h"
 
 #include "../ext/zlib/zlib.h"
+
+#include "last_error.h"
+
+//#include <Shlobj_core.h>
 
 #define myprint(stream) std::cout << stream << std::endl
 #define end(status) do { myprint("# TMFWSI is shutting down... Status: " << (status? "FAIL" : "OK")); \
@@ -19,9 +24,10 @@
 // 127 :3c
 #define DEFAULT_ADDRESS "127.58.51.99"
 
-#define HOSTS_PATH      "%SystemRoot%\\system32\\drivers\\etc\\"
+#define HOSTS_PATH      "C:\\Windows\\system32\\drivers\\etc\\"
 #define HOSTS           HOSTS_PATH "hosts"
-#define BACKUP_FILE     HOSTS_PATH "hosts.tmfwsi_bak"
+
+// 0x20000000	 user defined error
 
 namespace g
 {
@@ -156,40 +162,169 @@ void handle_openssl_errors()
     }
 }
 
-// TODO: is hosts_help obsolete?
-void hosts_help()
+// Starts a new hidden TMFWSI instance as admin with the specified arguments
+HRESULT run_tmfwsi(LPCSTR args)
 {
-    myprint("# -----");
-    myprint("# To manually modify your '" HOSTS "' file, add the following line using a text editor, without the quotes:");
-    myprint("# '" DEFAULT_ADDRESS " ws.trackmania.com'");
-    myprint("# This will redirect all traffic directed towards 'ws.trackmania.com' to this local address - it is required for TMFWSI to function properly.");
-    myprint("# However, if this entry is left in the 'hosts' file and TMFWSI is not running, all traffic to 'ws.trackmania.com' will effectively be 'blocked'.");
-    myprint("# TMFWSI attempts to automate this process - if successful, it will modify the 'hosts' file accordingly on startup and on application shutdown.");
-    myprint("# Please note that, should you decide to add this entry manually, it will be detected by TMFWSI on startup and will not be automatically removed.");
-    myprint("# -----");
+    char exe[MAX_PATH] = { 0 };
+    GetModuleFileNameA(NULL, exe, MAX_PATH);
+
+    SHELLEXECUTEINFOA sexi = { 0 };
+    sexi.cbSize = sizeof(sexi);
+    sexi.fMask = SEE_MASK_NOCLOSEPROCESS;
+    sexi.hwnd = GetConsoleWindow();
+    sexi.lpVerb = "runas";
+    sexi.lpFile = exe;
+    sexi.lpParameters = args;
+    sexi.nShow = SW_HIDE;
+
+    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    auto executed = ShellExecuteExA(&sexi);
+    CoUninitialize();
+
+    if (!executed)
+    {
+        auto gle = GetLastError();
+        if (gle != S_OK)
+        {
+            return gle;
+        }
+
+        switch ((int)sexi.hInstApp)
+        {
+            case SE_ERR_FNF: return ERROR_FILE_NOT_FOUND;
+            case SE_ERR_PNF: return ERROR_PATH_NOT_FOUND;
+            case SE_ERR_ACCESSDENIED: return ERROR_ACCESS_DENIED;
+            case SE_ERR_OOM: return ERROR_OUTOFMEMORY;
+            case SE_ERR_DLLNOTFOUND: return ERROR_DLL_NOT_FOUND;
+            case SE_ERR_SHARE: return ERROR_SHARING_VIOLATION;
+            //case SE_ERR_ASSOCINCOMPLETE:
+            case SE_ERR_DDETIMEOUT: return ERROR_DDE_FAIL;
+            case SE_ERR_DDEFAIL: return ERROR_DDE_FAIL;
+            case SE_ERR_DDEBUSY: return ERROR_DDE_FAIL;
+            case SE_ERR_NOASSOC: return ERROR_NO_ASSOCIATION;
+            default: return E_UNEXPECTED;
+        }
+    }
+
+    if (!sexi.hProcess)
+    {
+        return E_UNEXPECTED;
+    }
+
+    auto result = WaitForSingleObject(sexi.hProcess, INFINITE);
+    if (result != STATUS_WAIT_0)
+    {
+        if (result == WAIT_FAILED)
+        {
+            return GetLastError();
+        }
+
+        return result;
+    }
+
+    do
+    {
+        if (!GetExitCodeProcess(sexi.hProcess, &result))
+        {
+            return GetLastError();
+        }
+    }
+    while (result == STILL_ACTIVE);
+
+    return result;
 }
 
-void demo_perms(std::filesystem::perms p)
-{
-    using std::filesystem::perms;
-    auto show = [=](char op, perms perm)
-    {
-        std::cout << (perms::none == (perm & p) ? '-' : op);
-    };
-    show('r', perms::owner_read);
-    show('w', perms::owner_write);
-    show('x', perms::owner_exec);
-    show('r', perms::group_read);
-    show('w', perms::group_write);
-    show('x', perms::group_exec);
-    show('r', perms::others_read);
-    show('w', perms::others_write);
-    show('x', perms::others_exec);
-    std::cout << '\n';
-}
+namespace fs = std::filesystem;
 
 int main()
 {
+    auto cmdline = GetCommandLineA();
+
+    if (strstr(cmdline, "-do-hosts"))
+    {
+        // Calculate the path to the backup file
+        char path[MAX_PATH] = { 0 };
+        GetModuleFileNameA(NULL, path, MAX_PATH);
+
+        fs::path path_fs = path;
+        fs::path bak_fs = path_fs.parent_path() / "hosts.tmfwsi_bak";
+
+        std::string bak_str = bak_fs.string();
+        const char* bak = bak_str.c_str();
+        
+        // I will be very sad if you make a directory called "hosts.tmfwsi_bak"
+        auto attribs = GetFileAttributesA(bak);
+        if (attribs != INVALID_FILE_ATTRIBUTES && attribs & FILE_ATTRIBUTE_DIRECTORY)
+        {
+            return ERROR_DIRECTORY_NOT_SUPPORTED;
+        }
+
+        // Delete the old backup file, if any
+        if (!DeleteFileA(bak))
+        {
+            auto gle = GetLastError();
+
+            // If the file wasn't found, we don't care. If deletion failed for any other reason though, bail
+            if (gle != ERROR_FILE_NOT_FOUND)
+            {
+                return gle;
+            }
+        }
+
+        // Make a backup of the hosts file
+        if (!CopyFileA(HOSTS, bak, true))
+        {
+            return GetLastError();
+        }
+
+        // Modify the hosts file - make sure our local address replaces the Web Services
+        std::ofstream out;
+        out.open(HOSTS, std::ios::app);
+        if (!out.is_open())
+        {
+            out.close();
+            return ERROR_WRITE_PROTECT;
+        }
+
+        if (!(out << "\n\n" "// " TMFWSI "\n" DEFAULT_ADDRESS "\t" "ws.trackmania.com"))
+        {
+            out.close();
+            return ERROR_WRITE_PROTECT;
+        }
+
+        out.close();
+        return S_OK;
+    }
+
+    if (strstr(cmdline, "-undo-hosts"))
+    {
+        // Calculate the path to the backup file
+        char path[MAX_PATH] = { 0 };
+        GetModuleFileNameA(NULL, path, MAX_PATH);
+
+        fs::path path_fs = path;
+        fs::path bak_fs = path_fs.parent_path() / "hosts.tmfwsi_bak";
+
+        std::string bak_str = bak_fs.string();
+        const char* bak = bak_str.c_str();
+
+        // I will be very sad if you make a directory called "hosts.tmfwsi_bak"
+        auto attribs = GetFileAttributesA(bak);
+        if (attribs != INVALID_FILE_ATTRIBUTES && attribs & FILE_ATTRIBUTE_DIRECTORY)
+        {
+            return ERROR_DIRECTORY_NOT_SUPPORTED;
+        }
+
+        // Replace the 'hosts' file with our backup.
+        if (!CopyFileA(bak, HOSTS, false))
+        {
+            return GetLastError();
+        }
+
+        // We don't erase the backup here, in case the user needs it for whatever reason
+        return S_OK;
+    }
+
     SetConsoleTitleA(TMFWSI " " TMFWSI_VERSION);
 
     myprint("# -----");
@@ -288,13 +423,19 @@ int main()
 
     myprint("# SSL certificate generated.");
 
-    // TODO: CertAddCertificateContextToStore
+    myprint("# Modifying and backing up 'hosts' file...");
 
-    // TODO: check and modify hosts file
-    //myprint("# 'hosts' file permissions: ");
-    //demo_perms(std::filesystem::status(HOSTS).permissions());
-    //myprint("# 'etc' folder permissions: ");
-    //demo_perms(std::filesystem::status(HOSTS_PATH).permissions());
+    if (!strstr(cmdline, "-no-hosts"))
+    {
+        auto result = run_tmfwsi("-do-hosts");
+        if (result)
+        {
+            myprint("# Error: Failed to modify the 'hosts' file - " << LastError(result).Message());
+            end(1);
+        }
+    }
+
+    myprint("# 'hosts' file modified and backed up - it will be reverted once the program shuts down.");
 
     myprint("# Starting SSL server...");
     g::server = new httplib::SSLServer(x509, pkey);
@@ -331,7 +472,19 @@ int main()
     SetConsoleCtrlHandler(&handle_console, 0);
     delete g::server;
 
-    // TODO: revert hosts file
+    myprint("# Reverting 'hosts' file...");
+
+    if (!strstr(cmdline, "-no-hosts"))
+    {
+        auto result = run_tmfwsi("-undo-hosts");
+        if (result)
+        {
+            myprint("# Error: Failed to revert the 'hosts' file - " << LastError(result).Message());
+            end(1);
+        }
+    }
+
+    myprint("# 'hosts' file reverted.");
 
     end(status);
 }

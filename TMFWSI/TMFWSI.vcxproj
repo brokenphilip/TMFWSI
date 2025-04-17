@@ -246,6 +246,7 @@
     <ClInclude Include="ext\openssl\__DECC_INCLUDE_PROLOGUE.H" />
     <ClInclude Include="ext\zlib\zconf.h" />
     <ClInclude Include="ext\zlib\zlib.h" />
+    <ClInclude Include="src\last_error.h" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="ext\curl\libcurl.lib" />

@@ -473,6 +473,9 @@
     <ClInclude Include="ext\zlib\zlib.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\last_error.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Library Include="ext\openssl\libcrypto.lib" />
