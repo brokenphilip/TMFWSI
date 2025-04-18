@@ -93,6 +93,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\tmfwsi.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ext\curl\curl.h" />
@@ -246,7 +247,7 @@
     <ClInclude Include="ext\openssl\__DECC_INCLUDE_PROLOGUE.H" />
     <ClInclude Include="ext\zlib\zconf.h" />
     <ClInclude Include="ext\zlib\zlib.h" />
-    <ClInclude Include="src\last_error.h" />
+    <ClInclude Include="src\tmfwsi.h" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="ext\curl\libcurl.lib" />

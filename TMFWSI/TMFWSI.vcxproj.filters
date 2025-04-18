@@ -18,6 +18,9 @@
     <ClCompile Include="src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\tmfwsi.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ext\httplib.h">
@@ -473,7 +476,7 @@
     <ClInclude Include="ext\zlib\zlib.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\last_error.h">
+    <ClInclude Include="src\tmfwsi.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
