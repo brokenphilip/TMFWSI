@@ -430,7 +430,6 @@ int tmfwsi::main::update_check()
             {
                 log(log_level::info, "Already on the latest version");
             }
-
             return 0;
         }
     }
