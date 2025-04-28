@@ -8,33 +8,39 @@ TMFWSI intercepts traffic to TrackMania Forever Web Services (`ws.trackmania.com
 - "`ERROR_INTERNET_SEC_CERT_REVOKED` or `CRYPT_E_REVOKED` - The SSL certificate was revoked"
 
 By doing so, this allows you to log-in to the following services:
-- [home.trackmania.com](http://home.trackmania.com/) web page, to check your linked forums & authorized applications (and a lottery which may or may not work, lol)
+- [home.trackmania.com](http://home.trackmania.com/) web page, to check your linked forums & authorized applications
 - [developers.trackmania.com](http://developers.trackmania.com/) web page, to access the Web Services API
 - [maniapub](http://maniapub.trackmania.com/) Manialink, to manage your in-game advertisements
 - [freezone:servers](http://dedicp.maniastudio.com/) Manialink, to manage your FreeZone servers
 - any other website or Manialink not listed here that uses `ws.trackmania.com` for authentication
 
-Technically speaking, this is accomplished by locally hosting a middleman SSL server using [httplib](https://github.com/yhirose/cpp-httplib) and [OpenSSL](https://github.com/openssl/openssl), modifying your computer's `hosts` file to point to it, and using [cURL](https://github.com/curl/curl) (alongside [zlib](https://github.com/madler/zlib)) with the necessary parameters to establish a connection to the TMF Web Services by skipping certificate revocation checks - as this is all done locally on your machine, no data gets sent anywhere else.
+Technically speaking, this is accomplished by locally hosting a middleman SSL server using [httplib](https://github.com/yhirose/cpp-httplib) and [OpenSSL](https://github.com/openssl/openssl), modifying your computer's `hosts` file to point to it, and using [cURL](https://github.com/curl/curl) (alongside [zlib](https://github.com/madler/zlib)) with the necessary parameters to establish a connection to the TMF Web Services by skipping certificate revocation checks - as this is all done locally on your machine, no data gets sent anywhere else other than the TMF Web Services.
 
 > [!WARNING]
-> It is possible to repurpose this project to host a public server rather than a local one, but hosting and **especially** connecting to one is ill-advised because the host can easily read the communicated data, which is an obvious security hazard - you should only self-host TMFWSI, and the project is designed in such a way to make this process as easy as possible.
+> **Do not connect to anyone else's TMFWSI instance**, by editing the `hosts` file manually or otherwise. You should only self-host TMFWSI locally on your machine, and the project is designed in such a way to make this process as easy as possible.
 
 > [!CAUTION]
-> While this program is safer than the popular `inetcpl.cpl` alternate method (explained below), it is important to note that this is still a **very unsafe** way of communicating sensitive (login) data to a server and should merely be used as a temporary workaround for those that desperately require the above listed services, hence why the word "fixing" was put in quotes in the first paragraph - a proper fix would be for the maintainers of the TMF Web Services to renew its certificates and employ better security practices overall.
+> While this program is safer than the popular `inetcpl.cpl` alternate method (explained below), it is important to note that this is still a **very unsafe** way of communicating sensitive (login) data to a server and should merely be used as a temporary workaround for those that require the above listed services, hence why the word "fixing" was put in quotes in the first paragraph - a proper fix would be for the maintainers of the TMF Web Services to renew its certificates and employ better security practices overall.
 
 ## Usage
 1. Head over to [Releases](https://github.com/brokenphilip/TMFWSI/releases) and download the latest `TMFWSI.zip`
 2. Extract the the contents of the zip archive wherever you'd like
-3. When you need to access `ws.trackmania.com`, simply run the program
+3. When you need to access `ws.trackmania.com` or anything which uses it (for example, the services listed above), simply run the program
    - TrackMania Nations/United Forever, as well as some web browsers, will need to be restarted first
-4. Whenever you're done, simply close the program
+4. Whenever you're done, break out of (`Ctrl+C`) or shut down the program
 
 ## Troubleshooting
 If you encounter any issues during installation or usage, please refer to the [issue tracker](https://github.com/brokenphilip/TMFWSI/issues?q=). If you haven't found your issue, feel free to create a new one. If you have any further questions about the project, or if (understandably) using the issue tracker is too confusing, feel free to add me on Discord (`brokenphilip`) and I will try to get back to you as soon as possible. :)
 
-## Alternate method using `inetcpl.cpl`
+### Common issues
+*[todo]*
+
+## Alternate methods
+In case you wish not to use TMFWSI, or you're running into issues while using it, there are two alternative (but fairly technical) approaches:
+
+### Using `inetcpl.cpl`
 > [!CAUTION]
-> More unsafe and not recommended - either use TMFWSI or the cURL method, which are slightly-less-but-still unsafe.
+> **Not recommended**, as it's more unsafe and tends to not work on modern Windows versions - either use TMFWSI or the cURL method.
 
 1. Open Run (<kbd>Win</kbd> + <kbd>R</kbd>)
 2. Type `inetcpl.cpl` and press <kbd>Enter</kbd>
@@ -42,11 +48,14 @@ If you encounter any issues during installation or usage, please refer to the [i
 4. Untick "Check for server certificate revocation"
 5. Restart your computer, if required
 
-There is a similar method using `gpedit.msc` but it's needlessly more complicated and effectively achieves the same effect, but worse.
+There is a similar method using `gpedit.msc` but it's needlessly more complicated and effectively achieves the same effect.
 
-## Alternate method using cURL
+### Using cURL
 > [!WARNING]
-> As this method is of technical nature, it is assumed you have Cheat Engine, as well as a runnable version of cURL installed and added to your `PATH`. This method is very similar to how TMFWSI works internally, which does everything for you.
+> It is assumed you have Cheat Engine, as well as a runnable version of cURL installed and added to your `PATH`.
+
+> [!NOTE]
+> This method is very similar to how TMFWSI works internally, which does everything for you.
 1. Visit the site you wish to access, for example [developers.trackmania.com](http://developers.trackmania.com/), and attempt to log-in
    - For Manialinks, check the following paragraph
 2. Copy the resulting `ws.trackmania.com` URL
