@@ -388,6 +388,52 @@ int tmfwsi::main::init_curl()
 
 int tmfwsi::main::update_check()
 {
+    log(log_level::info, "Checking for updates...");
+
+    curl_easy_setopt(curl, CURLOPT_URL, "https://api.github.com/repos/brokenphilip/TMFWSI/tags");
+
+    // Save the result for later
+    std::string data;
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_writefn::string);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
+
+    // Required for the GitHub REST API
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, TMFWSI "/" TMFWSI_VERSION);
+
+    CURLcode res = curl_easy_perform(curl);
+    if (res)
+    {
+        log(log_level::warn, "Failed to perform the network transfer:");
+        error::curl(log_level::warn, res);
+        curl_easy_reset(curl);
+        return 0;
+    }
+
+    std::stringstream ss(data);
+    std::string token;
+    for (int i = 0; i < 4 && std::getline(ss, token, '"'); i++)
+    {
+        if (i == 1 && token != "name")
+        {
+            break;
+        }
+
+        if (i == 3)
+        {
+            if (token.compare(TMFWSI_VERSION))
+            {
+                log(log_level::warn, std::format("New version available (download via GitHub): {}", token));
+            }
+            else
+            {
+                log(log_level::info, "Already on the latest version");
+            }
+
+            return 0;
+        }
+    }
+
+    log(log_level::warn, "Failed to parse the response.");
     return 0;
 }
 
@@ -405,6 +451,7 @@ int tmfwsi::main::get_tmfws_ip()
     {
         log(log_level::error, "Failed to perform the network transfer:");
         error::curl(log_level::error, res);
+        curl_easy_reset(curl);
         return 1;
     }
 
@@ -414,12 +461,14 @@ int tmfwsi::main::get_tmfws_ip()
     {
         log(log_level::error, "Failed to get the IP address:");
         error::curl(log_level::error, res);
+        curl_easy_reset(curl);
         return 1;
     }
 
     if (!primary_ip)
     {
         log(log_level::error, "The IP address is blank.");
+        curl_easy_reset(curl);
         return 1;
     }
 
@@ -575,15 +624,6 @@ int tmfwsi::main::ssl_server::loop()
     return 0;
 }
 
-void tmfwsi::main::ssl_server::reset_curl(curl_slist* slist)
-{
-    if (slist)
-    {
-        curl_slist_free_all(slist);
-    }
-    curl_easy_reset(curl);
-}
-
 void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Response& response)
 {
     log(log_level::info, "Request received, performing...");
@@ -635,8 +675,11 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
 
     log(log_level::debug, "=== Received header END ===");
 
-    // Do not check for certificates, as they're expired anyways (which is what we're trying to work around in the first place lol)
-    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, false);
+    // Do not check for certificates, as they're expired anyways
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+    //curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+    //curl_easy_setopt(curl, CURLOPT_SSL_OPTIONS, CURLSSLOPT_ALLOW_BEAST | CURLSSLOPT_NO_REVOKE);
+
 
     // Save the result for later
     std::string data;
@@ -644,11 +687,14 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
 
     CURLcode res = curl_easy_perform(curl);
+
+    curl_slist_free_all(slist);
+
     if (res)
     {
         log(log_level::warn, "Failed to perform the network transfer:");
         error::curl(log_level::warn, res);
-        reset_curl(slist);
+        curl_easy_reset(curl);
         return;
     }
 
@@ -693,7 +739,7 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
             log(log_level::debug, "=== Sent header END ===");
 
             log(log_level::info, "Request performed successfully.");
-            reset_curl(slist);
+            curl_easy_reset(curl);
             return;
         }
 
@@ -706,7 +752,7 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
     log(log_level::debug, "=== Sent header END ===");
 
     log(log_level::info, "Request performed successfully.");
-    reset_curl(slist);
+    curl_easy_reset(curl);
 }
 
 int tmfwsi::main::undo_hosts()

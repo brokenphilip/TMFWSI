@@ -130,7 +130,6 @@ namespace tmfwsi
 		namespace ssl_server
 		{
 			int loop();
-			void reset_curl(curl_slist* slist);
 
 			void get(const httplib::Request& request, httplib::Response& response);
 		}
