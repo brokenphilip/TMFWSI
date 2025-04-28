@@ -528,12 +528,12 @@ BOOL WINAPI tmfwsi::main::control_handler(DWORD ctrl)
     if (!server_stopped && (ctrl == CTRL_C_EVENT || ctrl == CTRL_CLOSE_EVENT))
     {
         server_stopped = true;
-        log(log_level::info, "Close or CTRL+C event received - stopping server...");
+        log(log_level::warn, "Close or CTRL+C event received - stopping server...");
         server->stop();
-        return 1;
+        return TRUE;
     }
 
-    return 0;
+    return FALSE;
 }
 
 int tmfwsi::main::ssl_server::loop()
