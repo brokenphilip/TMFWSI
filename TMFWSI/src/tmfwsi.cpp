@@ -604,7 +604,7 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
     std::string url = "https://" + ip_str + request.path + params;
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 
-    // Enable cookie engine - might not do anything?
+    // Enable cookie engine - helps with Manialinks
     curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "");
 
     log(log_level::debug, std::format("Received URL: {}", url));
@@ -616,6 +616,13 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
     curl_slist* slist = nullptr;
     for (auto& it : request.headers)
     {
+        /*
+        if (it.first == "LOCAL_ADDR" || it.first == "LOCAL_PORT" || it.first == "REMOTE_ADDR" || it.first == "REMOTE_PORT")
+        {
+            continue;
+        }
+        */
+
         std::string tag = it.first + ":" + it.second;
         curl_slist_append(slist, tag.c_str());
 
