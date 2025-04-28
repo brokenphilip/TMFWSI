@@ -409,6 +409,8 @@ int tmfwsi::main::update_check()
         return 0;
     }
 
+    curl_easy_reset(curl);
+
     std::stringstream ss(data);
     std::string token;
     for (int i = 0; i < 4 && std::getline(ss, token, '"'); i++)
