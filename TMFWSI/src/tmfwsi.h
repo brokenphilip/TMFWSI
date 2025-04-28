@@ -14,6 +14,8 @@
 #include "../ext/httplib.h"
 
 #define TMFWSI "TrackMania Forever Web Services Interceptor"
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MAKE SURE TO UPDATE THE VERSION RESOURCE AS WELL !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #define TMFWSI_VERSION "1.0"
 
 // 127 :3c
@@ -104,12 +106,22 @@ namespace tmfwsi
 	int main_do_hosts();
 	int main_undo_hosts();
 
+	namespace curl_writefn
+	{
+		template <typename T>
+		using writefn_t = size_t(void* buffer, size_t size, size_t n_items, T* data);
+
+		writefn_t<void> dummy;
+		writefn_t<std::string> string;
+	}
+
 	namespace main
 	{
 		int init_console();
-		int update_check();
 		int init_resource();
 		int init_curl();
+		int update_check();
+		int get_tmfws_ip();
 		int generate_ssl_certificate();
 		int do_hosts();
 

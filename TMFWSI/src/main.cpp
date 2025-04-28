@@ -24,10 +24,13 @@ int main()
         return tmfwsi::main::cleanup(result);
     }
 
-    result = tmfwsi::main::update_check();
-    if (result)
+    if (!strstr(cmdline, "-no-update"))
     {
-        return tmfwsi::main::cleanup(result);
+        result = tmfwsi::main::update_check();
+        if (result)
+        {
+            return tmfwsi::main::cleanup(result);
+        }
     }
 
     result = tmfwsi::main::init_resource();

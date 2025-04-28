@@ -268,6 +268,17 @@ int tmfwsi::main_undo_hosts()
     return S_OK;
 }
 
+size_t tmfwsi::curl_writefn::dummy(void* buffer, size_t size, size_t n_items, void* unused)
+{
+    return size * n_items;
+}
+
+size_t tmfwsi::curl_writefn::string(void* buffer, size_t size, size_t n_items, std::string* str)
+{
+    str->append(static_cast<char*>(buffer), size * n_items);
+    return size * n_items;
+}
+
 int tmfwsi::main::init_console()
 {
     SetConsoleTitleA(TMFWSI " " TMFWSI_VERSION);
@@ -310,12 +321,6 @@ int tmfwsi::main::init_console()
     log(log_level::info, "----------");
 
     log(log_level::debug, "Debug mode enabled.");
-    return 0;
-}
-
-int tmfwsi::main::update_check()
-{
-    // TODO: copy from omsipresence
     return 0;
 }
 
@@ -370,15 +375,22 @@ int tmfwsi::main::init_curl()
         return 1;
     }
 
+    return 0;
+}
+
+int tmfwsi::main::update_check()
+{
+    return 0;
+}
+
+int tmfwsi::main::get_tmfws_ip()
+{
     log(log_level::info, "Fetching IP address of TrackMania Forever Web Services...");
 
     curl_easy_setopt(curl, CURLOPT_URL, "http://ws.trackmania.com/");
 
     // Don't write to stdout
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, +[](void* buffer, size_t size, size_t n_items, void* unused)
-    {
-        return size * n_items;
-    });
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_writefn::dummy);
 
     CURLcode res = curl_easy_perform(curl);
     if (res)
@@ -613,11 +625,7 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
 
     // Save the result for later
     std::string data;
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, +[](void* buffer, size_t size, size_t n_items, std::string* data)
-    {
-        data->append(static_cast<char*>(buffer), size * n_items);
-        return size * n_items;
-    });
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_writefn::string);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
 
     CURLcode res = curl_easy_perform(curl);
@@ -648,10 +656,12 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
     {
         // HACK: If the TMFWS wants to redirect us to the Player Page in the Manialink browser, we need to tell the user to log in through their web browser first
         // TODO: Find out why this is broken, I assume this is on TMFWSI's end but there is a possibility this could be on Nadeo's end as well, no idea
-        const char* const player_page = "https://players.trackmaniaforever.com/";
+        constexpr auto player_page = "https://players.trackmaniaforever.com/";
+        constexpr auto player_page_len = std::char_traits<char>::length(player_page);
+
         bool is_user_agent_gamebox = request.has_header("User-Agent") && request.get_header_value("User-Agent") == "GameBox";
 
-        if (!strcmp(header->name, "Location") && !strncmp(header->value, player_page, strlen(player_page)) && is_user_agent_gamebox)
+        if (!strcmp(header->name, "Location") && !strncmp(header->value, player_page, player_page_len) && is_user_agent_gamebox)
         {
             response.headers.clear();
             response.status = 200; // OK
