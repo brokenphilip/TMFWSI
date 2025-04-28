@@ -479,11 +479,22 @@
     <ClInclude Include="src\tmfwsi.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Library Include="ext\openssl\libcrypto.lib" />
     <Library Include="ext\openssl\libssl.lib" />
     <Library Include="ext\curl\libcurl.lib" />
     <Library Include="ext\zlib\zlib.lib" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="TMFWSI.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="note.xml" />
   </ItemGroup>
 </Project>

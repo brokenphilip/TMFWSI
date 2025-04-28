@@ -12,7 +12,31 @@ int main()
         return tmfwsi::main_undo_hosts();
     }
 
-    auto result = tmfwsi::main::init();
+    // Only if we're not in debug mode already (at compile time)
+    if (!tmfwsi::debug)
+    {
+        tmfwsi::debug = strstr(cmdline, "-debug");
+    }
+
+    auto result = tmfwsi::main::init_console();
+    if (result)
+    {
+        return tmfwsi::main::cleanup(result);
+    }
+
+    result = tmfwsi::main::update_check();
+    if (result)
+    {
+        return tmfwsi::main::cleanup(result);
+    }
+
+    result = tmfwsi::main::init_resource();
+    if (result)
+    {
+        return tmfwsi::main::cleanup(result);
+    }
+
+    result = tmfwsi::main::init_curl();
     if (result)
     {
         return tmfwsi::main::cleanup(result);

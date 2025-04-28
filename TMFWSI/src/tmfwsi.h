@@ -3,6 +3,7 @@
 #include <iostream>
 #include <filesystem>
 #include <fstream>
+#include <regex>
 
 #define CURL_STATICLIB
 #include "../ext/curl/curl.h"
@@ -11,8 +12,6 @@
 
 #define CPPHTTPLIB_OPENSSL_SUPPORT
 #include "../ext/httplib.h"
-
-#define myprint(stream) std::cout << stream << std::endl
 
 #define TMFWSI "TrackMania Forever Web Services Interceptor"
 #define TMFWSI_VERSION "1.0"
@@ -26,6 +25,8 @@
 namespace tmfwsi
 {
 	inline char ip[16] = { 0 };
+
+	inline std::string xml = "";
 
 	inline CURL* curl = nullptr;
 	inline EVP_PKEY* pkey = nullptr;
@@ -56,6 +57,7 @@ namespace tmfwsi
 			const char* message();
 		};
 
+		void curl(CURLcode c);
 		void openssl();
 
 		constexpr int customer = 1 << 29;
@@ -88,12 +90,24 @@ namespace tmfwsi
 	// Starts a new hidden TMFWSI instance as admin with the specified arguments
 	DWORD run(LPCSTR args);
 
+	enum class log_level
+	{
+		info,
+		warn,
+		error,
+		debug
+	};
+	void log(log_level ll, std::string str);
+
 	int main_do_hosts();
 	int main_undo_hosts();
 
 	namespace main
 	{
-		int init();
+		int init_console();
+		int update_check();
+		int init_resource();
+		int init_curl();
 		int generate_ssl_certificate();
 		int do_hosts();
 
@@ -102,6 +116,7 @@ namespace tmfwsi
 		namespace ssl_server
 		{
 			int loop();
+			void reset_curl(curl_slist* slist);
 
 			void get(const httplib::Request& request, httplib::Response& response);
 		}

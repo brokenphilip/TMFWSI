@@ -247,6 +247,7 @@
     <ClInclude Include="ext\openssl\__DECC_INCLUDE_PROLOGUE.H" />
     <ClInclude Include="ext\zlib\zconf.h" />
     <ClInclude Include="ext\zlib\zlib.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="src\tmfwsi.h" />
   </ItemGroup>
   <ItemGroup>
@@ -254,6 +255,12 @@
     <Library Include="ext\openssl\libcrypto.lib" />
     <Library Include="ext\openssl\libssl.lib" />
     <Library Include="ext\zlib\zlib.lib" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="TMFWSI.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="note.xml" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

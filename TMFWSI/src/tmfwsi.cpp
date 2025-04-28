@@ -1,4 +1,5 @@
 #include "tmfwsi.h"
+#include "../resource.h"
 
 tmfwsi::error::last::last(DWORD last_error)
 {
@@ -19,6 +20,11 @@ const char* tmfwsi::error::last::message()
     return msg ? msg : "Unknown error - FormatMessageA failed.";
 }
 
+void tmfwsi::error::curl(CURLcode c)
+{
+    log(log_level::info, std::format("{} (CURLcode: {})", curl_easy_strerror(c), (int)c));
+}
+
 void tmfwsi::error::openssl()
 {
     unsigned long e = 0L;
@@ -29,7 +35,7 @@ void tmfwsi::error::openssl()
         auto lib = ERR_lib_error_string(e);
         auto reason = ERR_reason_error_string(e);
 
-        myprint("# " << i << ". [" << e << "] " << error << " (lib: " << lib << ") (reason: " << reason << ")");
+        log(log_level::info, std::format("{}. [{}] {} (lib: {}) (reason: {})", i, e, error, lib, reason));
     }
 }
 
@@ -148,6 +154,28 @@ DWORD tmfwsi::run(LPCSTR args)
     return result;
 }
 
+void tmfwsi::log(log_level ll, std::string str)
+{
+    if (ll == log_level::debug && !debug)
+    {
+        return;
+    }
+
+    SYSTEMTIME time;
+    GetLocalTime(&time);
+    std::string prefix = std::format("[{:02d}:{:02d}:{:02d} ", time.wHour, time.wMinute, time.wSecond);
+
+    switch (ll)
+    {
+        case log_level::warn: prefix += "\x1B[93m WARN\x1B[0m]"; break;
+        case log_level::error: prefix += "\x1B[91mERROR\x1B[0m]"; break;
+        case log_level::debug: prefix += "\x1B[95mDEBUG\x1B[0m]"; break;
+        default: prefix += "\x1B[97m INFO\x1B[0m]"; break;
+    }
+
+    std::cout << prefix << " " << str << std::endl;
+}
+
 namespace fs = std::filesystem;
 
 int tmfwsi::main_do_hosts()
@@ -235,24 +263,98 @@ int tmfwsi::main_undo_hosts()
     return S_OK;
 }
 
-int tmfwsi::main::init()
+int tmfwsi::main::init_console()
 {
-    SetConsoleTitleA(TMFWSI " " TMFWSI_VERSION);
-
-    myprint("# -----");
-    myprint("# " TMFWSI " " TMFWSI_VERSION " by brokenphilip");
-    myprint("# Compiled with 'cURL " << curl_version_info(CURLVERSION_NOW)->version << "', '" OPENSSL_VERSION_TEXT "' and 'zlib " ZLIB_VERSION "'.");
-    myprint("# For more information and troubleshooting, please visit: https://github.com/brokenphilip/TMFWSI");
-    myprint("# -----");
-
-    curl = curl_easy_init();
-    if (!curl)
+    if (!SetConsoleTitleA(TMFWSI " " TMFWSI_VERSION))
     {
-        myprint("# Error: Failed to initialize cURL!");
+        log(log_level::warn, "Failed to set the console title.");
+    }
+
+    auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (handle == INVALID_HANDLE_VALUE)
+    {
+        log(log_level::error, "Failed to get the standard output handle.");
+        return 1;
+    }
+    else if (!handle)
+    {
+        log(log_level::error, "No standard output handle was found.");
         return 1;
     }
 
-    myprint("# Fetching IP address of TrackMania Forever Web Services...");
+    DWORD mode;
+    if (!GetConsoleMode(handle, &mode))
+    {
+        log(log_level::error, "Failed to get the console mode.");
+        return 1;
+    }
+
+    if (!SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN))
+    {
+        log(log_level::error, "Failed to set the console mode.");
+        return 1;
+    }
+
+    log(log_level::info, "----------");
+    log(log_level::info, TMFWSI " " TMFWSI_VERSION " by brokenphilip");
+    log(log_level::info, std::format("Compiled with 'cURL {}', '" OPENSSL_VERSION_TEXT "' and 'zlib " ZLIB_VERSION "'.", curl_version_info(CURLVERSION_NOW)->version));
+    log(log_level::info, "For more information and troubleshooting, please visit: https://github.com/brokenphilip/TMFWSI");
+    log(log_level::info, "----------");
+
+    log(log_level::debug, "Debug mode enabled.");
+    return 0;
+}
+
+int tmfwsi::main::update_check()
+{
+    // TODO: copy from omsipresence
+    return 0;
+}
+
+int tmfwsi::main::init_resource()
+{
+    auto resource = FindResourceA(NULL, MAKEINTRESOURCE(IDR_XML1), "XML");
+    if (!resource)
+    {
+        log(log_level::error, "Failed to find the XML resource.");
+        return 1;
+    }
+
+    auto global = LoadResource(NULL, resource);
+    if (!global)
+    {
+        log(log_level::error, "Failed to load the XML resource.");
+        return 1;
+    }
+
+    auto pointer = LockResource(global);
+    if (!pointer)
+    {
+        log(log_level::error, "Failed to lock the XML resource.");
+        return 1;
+    }
+
+    auto xml_len = SizeofResource(NULL, resource);
+    if (!xml_len)
+    {
+        log(log_level::error, "Failed to get the size of the XML resource.");
+        return 1;
+    }
+
+    xml = std::string(static_cast<char*>(pointer), xml_len);
+    return 0;
+}
+
+int tmfwsi::main::init_curl()
+{
+    curl = curl_easy_init();
+    if (!curl)
+    {
+        log(log_level::error, "Failed to initialize cURL.");
+        return 1;
+    }
+
+    log(log_level::info, "Fetching IP address of TrackMania Forever Web Services...");
 
     curl_easy_setopt(curl, CURLOPT_URL, "http://ws.trackmania.com/");
 
@@ -265,7 +367,8 @@ int tmfwsi::main::init()
     CURLcode res = curl_easy_perform(curl);
     if (res)
     {
-        myprint("# Error: " << curl_easy_strerror(res) << " (CURLcode: " << res << ")");
+        log(log_level::error, "Failed to perform the network transfer.");
+        error::curl(res);
         return 1;
     }
 
@@ -273,17 +376,18 @@ int tmfwsi::main::init()
     res = curl_easy_getinfo(curl, CURLINFO_PRIMARY_IP, &primary_ip);
     if (res)
     {
-        myprint("# Error: " << curl_easy_strerror(res) << " (CURLcode: " << res << ")");
+        log(log_level::error, "Failed to get the IP address.");
+        error::curl(res);
         return 1;
     }
 
     if (!primary_ip)
     {
-        myprint("# Error: IP address is blank!");
+        log(log_level::error, "The IP address is blank.");
         return 1;
     }
 
-    myprint("# TrackMania Forever Web Services IP address: " << primary_ip);
+    log(log_level::info, std::format("TrackMania Forever Web Services IP address: {}", primary_ip));
     strcpy_s(ip, primary_ip);
     curl_easy_reset(curl);
     return 0;
@@ -291,19 +395,19 @@ int tmfwsi::main::init()
 
 int tmfwsi::main::generate_ssl_certificate()
 {
-    myprint("# Generating SSL certificate...");
+    log(log_level::info, "Generating SSL certificate...");
 
     pkey = EVP_RSA_gen(2048);
     if (!pkey)
     {
-        myprint("# Error: Failed to generate RSA key pair!");
+        log(log_level::error, "Failed to generate RSA key pair.");
         return 1;
     }
 
     x509 = X509_new();
     if (!x509)
     {
-        myprint("# Error: Failed to generate X509 certificate structure! The following errors occurred:");
+        log(log_level::error, "Failed to generate X509 certificate structure. The following errors occurred:");
         error::openssl();
         return 1;
     }
@@ -311,7 +415,7 @@ int tmfwsi::main::generate_ssl_certificate()
     // Set our certificate's serial number to 1 (default is 0, but sometimes it can be refused?)
     if (!ASN1_INTEGER_set(X509_get_serialNumber(x509), 1))
     {
-        myprint("# Error: Failed to set the certificate's serial number!");
+        log(log_level::error, "Failed to set the certificate's serial number.");
         return 1;
     }
 
@@ -319,67 +423,67 @@ int tmfwsi::main::generate_ssl_certificate()
     constexpr long one_year = 60L /* seconds */ * 60L /* minutes */ * 24L /* hours */ * 365L /* days */;
     if (!X509_gmtime_adj(X509_get_notBefore(x509), 0))
     {
-        myprint("# Error: Failed to set the certificate's begin date!");
+        log(log_level::error, "Failed to set the certificate's begin date.");
         return 1;
     }
     if (!X509_gmtime_adj(X509_get_notAfter(x509), one_year))
     {
-        myprint("# Error: Failed to set the certificate's end date!");
+        log(log_level::error, "Failed to set the certificate's end date.");
         return 1;
     }
 
     if (!X509_set_pubkey(x509, pkey))
     {
-        myprint("# Error: Failed to set the certificate's public key!");
+        log(log_level::error, "Failed to set the certificate's public key.");
         return 1;
     }
 
     auto name = X509_get_subject_name(x509);
     if (!X509_NAME_add_entry_by_txt(name, "C", MBSTRING_ASC, (unsigned char*)"RS", -1, -1, 0))
     {
-        myprint("# Error: Failed to set the certificate's country!");
+        log(log_level::error, "Failed to set the certificate's country.");
         return 1;
     }
     if (!X509_NAME_add_entry_by_txt(name, "O", MBSTRING_ASC, (unsigned char*)"brokenphilip", -1, -1, 0))
     {
-        myprint("# Error: Failed to set the certificate's organization!");
+        log(log_level::error, "Failed to set the certificate's organization.");
         return 1;
     }
     if (!X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, (unsigned char*)TMFWSI, -1, -1, 0))
     {
-        myprint("# Error: Failed to set the certificate's common name!");
+        log(log_level::error, "Failed to set the certificate's common name.");
         return 1;
     }
 
     if (!X509_set_issuer_name(x509, name))
     {
-        myprint("# Error: Failed to set the certificate's issuer!");
+        log(log_level::error, "Failed to set the certificate's issuer.");
         return 1;
     }
 
     if (!X509_sign(x509, pkey, EVP_sha1()))
     {
-        myprint("# Error: Failed to sign the certificate!");
+        log(log_level::error, "Failed to sign the certificate.");
         return 1;
     }
 
-    myprint("# SSL certificate generated.");
+    log(log_level::info, "SSL certificate generated.");
     return 0;
 }
 
 int tmfwsi::main::do_hosts()
 {
-    myprint("# Modifying and backing up 'hosts' file...");
+    log(log_level::info, "Modifying and backing up 'hosts' file...");
 
     auto e_tmfwsi = tmfwsi::run("-do-hosts");
     if (e_tmfwsi)
     {
         auto e = error::parse(e_tmfwsi);
-        myprint("# Error: Failed to modify the 'hosts' file - " << error::cause_name(e_tmfwsi) << ": " << error::last(e).message() << " (Code: " << e << ")");
+        log(log_level::error, std::format("{}: {} (Code: {})", error::cause_name(e_tmfwsi), error::last(e).message(), e));
         return 1;
     }
 
-    myprint("# 'hosts' file modified and backed up - it will be reverted once the program shuts down.");
+    log(log_level::info, "'hosts' file modified and backed up - it will be reverted once the program shuts down.");
 	return 0;
 }
 
@@ -388,7 +492,7 @@ BOOL WINAPI tmfwsi::main::control_handler(DWORD ctrl)
     if (!server_stopped && (ctrl == CTRL_C_EVENT || ctrl == CTRL_CLOSE_EVENT))
     {
         server_stopped = true;
-        myprint("# Close or CTRL+C event received - stopping server...");
+        log(log_level::info, "Close or CTRL+C event received - stopping server...");
         server->stop();
         return 1;
     }
@@ -398,46 +502,55 @@ BOOL WINAPI tmfwsi::main::control_handler(DWORD ctrl)
 
 int tmfwsi::main::ssl_server::loop()
 {
-    myprint("# Starting SSL server...");
-    server = new httplib::SSLServer(x509, pkey);
+    log(log_level::info, "Starting SSL server...");
+
     SetConsoleCtrlHandler(&main::control_handler, 1);
 
+    server = new httplib::SSLServer(x509, pkey);
     if (!server->bind_to_port(DEFAULT_ADDRESS, 443))
     {
-        myprint("# Error: Failed to bind to address " DEFAULT_ADDRESS ":443 - make sure it is not in use!");
-
-        SetConsoleCtrlHandler(&main::control_handler, 0);
+        log(log_level::warn, "SSL server not started - unable to bind to address " DEFAULT_ADDRESS ":443, make sure it is valid and not in use.");
 
         delete server;
         server = nullptr;
 
-        return 1;
-    }
+        SetConsoleCtrlHandler(&main::control_handler, 0);
 
+        return 0;
+    }
     server->Get(R"(.*)", ssl_server::get);
 
     // TODO: custom address launch parameter
-    myprint("# SSL Server started - listening to " DEFAULT_ADDRESS ":443...");
+    log(log_level::info, "SSL Server started - listening to requests on " DEFAULT_ADDRESS ":443...");
     server->listen_after_bind();
-
-    SetConsoleCtrlHandler(&main::control_handler, 0);
 
     delete server;
     server = nullptr;
 
+    SetConsoleCtrlHandler(&main::control_handler, 0);
+
     if (!server_stopped)
     {
-        myprint("# Error: An error occurred while listening!");
-        return 1;
+        log(log_level::warn, "Server has been stopped prematurely.");
+        return 0;
     }
 
-    myprint("# Server has been stopped.");
+    log(log_level::info, "Server has been stopped.");
     return 0;
+}
+
+void tmfwsi::main::ssl_server::reset_curl(curl_slist* slist)
+{
+    if (slist)
+    {
+        curl_slist_free_all(slist);
+    }
+    curl_easy_reset(curl);
 }
 
 void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Response& response)
 {
-    myprint("# Request received...");
+    log(log_level::info, "Request received, performing...");
 
     // First, let's build our URL, making sure to include the query string
     bool first = true;
@@ -458,12 +571,8 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
     // Enable cookie engine - might not do anything?
     curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "");
 
-    if (debug)
-    {
-        myprint("!! Received URL: " << url);
-
-        myprint("!! === Received header START === ");
-    }
+    log(log_level::debug, std::format("Received URL: {}", url));
+    log(log_level::debug, "=== Received header START ===");
 
     // Next, fetch the request headers
     // User-Agent in particular is very important - for reference, TMF uses "GameBox" and MP uses "ManiaPlanet" for their in-game Manialink browsers
@@ -474,20 +583,14 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
         std::string tag = it.first + ":" + it.second;
         curl_slist_append(slist, tag.c_str());
 
-        if (debug)
-        {
-            std::cout << tag << std::endl;
-        }
+        log(log_level::debug, tag);
     }
     if (slist)
     {
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist);
     }
 
-    if (debug)
-    {
-        myprint("!! === Received header END === ");
-    }
+    log(log_level::debug, "=== Received header END ===");
 
     // Do not check for certificates, as they're expired anyways (which is what we're trying to work around in the first place lol)
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, false);
@@ -504,74 +607,87 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
     CURLcode res = curl_easy_perform(curl);
     if (res)
     {
-        myprint("# Error: " << curl_easy_strerror(res) << " (CURLcode: " << res << ")");
+        log(log_level::warn, "Failed to perform the network transfer.");
+        error::curl(res);
+        reset_curl(slist);
+        return;
     }
-    else
+
+    // Set the HTTP code
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response.status);
+
+    // Set the content to the result we saved earlier
+    response.body = data;
+
+    log(log_level::debug, std::format("Response code: {}", response.status));
+    log(log_level::debug, "=== Sent data START ===");
+    log(log_level::debug, data);
+    log(log_level::debug, "=== Sent data END ===");
+    log(log_level::debug, "=== Sent header START ===");
+
+    // Set the headers
+    curl_header* prev = nullptr;
+    curl_header* header = nullptr;
+    while ((header = curl_easy_nextheader(curl, CURLH_HEADER, 0, prev)))
     {
-        // Set the HTTP code
-        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response.status);
-
-        // Set the content to the result we saved earlier
-        response.body = data;
-
-        if (debug)
+        // HACK: If the TMFWS wants to redirect us to the Player Page in the Manialink browser, we need to tell the user to log in through their web browser first
+        // TODO: Find out why this is broken, I assume this is on TMFWSI's end but there is a possibility this could be on Nadeo's end as well, no idea
+        const char* const player_page = "https://players.trackmaniaforever.com/";
+        if (!strcmp(header->name, "Location") &&
+            !strncmp(header->value, player_page, strlen(player_page)) &&
+            request.has_header("User-Agent") &&
+            request.get_header_value("User-Agent") == "GameBox")
         {
-            myprint("!! === Sent data START === ");
-            std::cout << data << std::endl;
-            myprint("!! === Sent data END === ");
+            response.headers.clear();
+            response.status = 200; // OK
 
-            myprint("!! === Sent header START === ");
+            // Maniacode's <show_message> breaks $l links - they won't be opened until the user presses 'OK', so we need to make it a Manialink instead
+            response.body = xml;
+
+            response.body = std::regex_replace(response.body, std::regex("%URL1%"), header->value + 8);
+            response.body = std::regex_replace(response.body, std::regex("%URL2%"), header->value);
+            response.body = std::regex_replace(response.body, std::regex("&"), "&amp;");
+
+            log(log_level::debug, std::format("{}:{}", header->name, header->value));
+            log(log_level::debug, "[Headers SKIPPED, due to GameBox User-Agent - sending ManiaLink instead...]");
+            log(log_level::debug, "=== Sent header END ===");
+
+            log(log_level::info, "Request performed successfully.");
+            reset_curl(slist);
+            return;
         }
 
-        // Set the headers
-        curl_header* prev = nullptr;
-        curl_header* header = nullptr;
-        while ((header = curl_easy_nextheader(curl, CURLH_HEADER, 0, prev)))
-        {
-            if (debug)
-            {
-                std::cout << header->name << ":" << header->value << std::endl;
-            }
+        log(log_level::debug, std::format("{}:{}", header->name, header->value));
 
-            response.set_header(header->name, header->value);
-            prev = header;
-        }
-
-        if (debug)
-        {
-            myprint("!! === Sent header END === ");
-        }
-
-        myprint("# Success!");
+        response.set_header(header->name, header->value);
+        prev = header;
     }
 
-    // Done :3
-    if (slist)
-    {
-        curl_slist_free_all(slist);
-    }
-    curl_easy_reset(curl);
+    log(log_level::debug, "=== Sent header END ===");
+
+    log(log_level::info, "Request performed successfully.");
+    reset_curl(slist);
 }
 
 int tmfwsi::main::undo_hosts()
 {
-    myprint("# Reverting 'hosts' file...");
+    log(log_level::info, "Reverting 'hosts' file...");
 
     auto e_tmfwsi = tmfwsi::run("-undo-hosts");
     if (e_tmfwsi)
     {
         auto e = error::parse(e_tmfwsi);
-        myprint("# Error: Failed to revert the 'hosts' file - " << error::cause_name(e_tmfwsi) << ": " << error::last(e).message() << " (Code: " << e << ")");
+        log(log_level::error, std::format("{}: {} (Code: {})", error::cause_name(e_tmfwsi), error::last(e).message(), e));
         return 1;
     }
 
-    myprint("# 'hosts' file reverted.");
+    log(log_level::info, "'hosts' file reverted.");
     return 0;
 }
 
 int tmfwsi::main::cleanup(int status)
 {
-    myprint("# TMFWSI is shutting down... Status: " << (status ? "FAIL" : "OK"));
+    log(log_level::info, std::format("TMFWSI is shutting down... Status: {}", (status ? "FAIL" : "OK")));
 
     if (x509)
     {

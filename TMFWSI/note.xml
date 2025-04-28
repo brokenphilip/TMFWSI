@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<manialink>
+  <timeout>0</timeout>
+  <quad sizen='70 50' halign='center' valign='center' style='Bgs1' substyle='BgWindow2'/>
+  <frame posn='0 24 1'>
+    <frame>
+      <quad sizen='68 4' halign='center' style='Bgs1' substyle='BgTitle2'/>
+      <label posn='0 -0.75 0' sizen='66 3' halign='center' style='TextTitleError' text='TMFWSI Note'/>
+    </frame>
+  </frame>
+  <label posn='-32 0 2' sizen='64 3' halign='left' valign='center' style='TextStaticSmall' text='$fffThe TrackMania Web Services API wants to redirect you to the Player Page for authentication, which cannot be opened as a Manialink. There are two possible ways to resolve this:
+         
+         1. Open $f80$lhome.trackmania.com$l$fff or $f80$ldevelopers.trackmania.com$l$fff in your web browser, log in, and then try the Manialink again.
+         
+         2. Click $f80$l[%URL1%]here$l$fff to open the Player Page in your web browser - after logging in, copy the resulting URL and paste it in-game as if it were a regular Manialink.
+         
+         Alternatively, if you believe this was a mistake, you can try opening the Player Page link directly as a Manialink instead.' autonewline='1'/>
+  <label posn='0 -20 5' sizen='26 4' halign='center' style='CardButtonMedium' manialink='%URL2%' text='Open as Manialink'/>
+</manialink>
