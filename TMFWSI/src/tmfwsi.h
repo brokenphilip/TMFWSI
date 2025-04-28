@@ -42,6 +42,14 @@ namespace tmfwsi
 	inline bool debug = false;
 #endif
 
+	enum class log_level
+	{
+		info,
+		warn,
+		error,
+		debug
+	};
+
 	namespace error
 	{
 		// Simple RAII implementation of GetLastError
@@ -57,8 +65,9 @@ namespace tmfwsi
 			const char* message();
 		};
 
-		void curl(CURLcode c);
-		void openssl();
+		void curl(log_level ll, CURLcode c);
+		void openssl(log_level ll);
+		void windows(log_level ll, DWORD gle);
 
 		constexpr int customer = 1 << 29;
 
@@ -90,13 +99,6 @@ namespace tmfwsi
 	// Starts a new hidden TMFWSI instance as admin with the specified arguments
 	DWORD run(LPCSTR args);
 
-	enum class log_level
-	{
-		info,
-		warn,
-		error,
-		debug
-	};
 	void log(log_level ll, std::string str);
 
 	int main_do_hosts();

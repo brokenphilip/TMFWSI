@@ -20,12 +20,12 @@ const char* tmfwsi::error::last::message()
     return msg ? msg : "Unknown error - FormatMessageA failed.";
 }
 
-void tmfwsi::error::curl(CURLcode c)
+void tmfwsi::error::curl(log_level ll, CURLcode c)
 {
-    log(log_level::info, std::format("{} (CURLcode: {})", curl_easy_strerror(c), (int)c));
+    log(ll, std::format("{} (CURLcode: {})", curl_easy_strerror(c), (int)c));
 }
 
-void tmfwsi::error::openssl()
+void tmfwsi::error::openssl(log_level ll)
 {
     unsigned long e = 0L;
 
@@ -35,8 +35,13 @@ void tmfwsi::error::openssl()
         auto lib = ERR_lib_error_string(e);
         auto reason = ERR_reason_error_string(e);
 
-        log(log_level::info, std::format("{}. [{}] {} (lib: {}) (reason: {})", i, e, error, lib, reason));
+        log(ll, std::format("{}. [{}] {} (lib: {}) (reason: {})", i, e, error, lib, reason));
     }
+}
+
+void tmfwsi::error::windows(log_level ll, DWORD gle)
+{
+    log(ll, std::format("{} (Code: {})", error::last(gle).message(), gle));
 }
 
 DWORD tmfwsi::error::make(DWORD e, cause f)
@@ -265,15 +270,14 @@ int tmfwsi::main_undo_hosts()
 
 int tmfwsi::main::init_console()
 {
-    if (!SetConsoleTitleA(TMFWSI " " TMFWSI_VERSION))
-    {
-        log(log_level::warn, "Failed to set the console title.");
-    }
+    SetConsoleTitleA(TMFWSI " " TMFWSI_VERSION);
 
     auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
     if (handle == INVALID_HANDLE_VALUE)
     {
-        log(log_level::error, "Failed to get the standard output handle.");
+        auto gle = GetLastError();
+        log(log_level::error, "Failed to get the standard output handle:");
+        error::windows(log_level::error, gle);
         return 1;
     }
     else if (!handle)
@@ -285,13 +289,17 @@ int tmfwsi::main::init_console()
     DWORD mode;
     if (!GetConsoleMode(handle, &mode))
     {
-        log(log_level::error, "Failed to get the console mode.");
+        auto gle = GetLastError();
+        log(log_level::error, "Failed to get the console mode:");
+        error::windows(log_level::error, gle);
         return 1;
     }
 
     if (!SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN))
     {
-        log(log_level::error, "Failed to set the console mode.");
+        auto gle = GetLastError();
+        log(log_level::error, "Failed to set the console mode:");
+        error::windows(log_level::error, gle);
         return 1;
     }
 
@@ -316,28 +324,36 @@ int tmfwsi::main::init_resource()
     auto resource = FindResourceA(NULL, MAKEINTRESOURCE(IDR_XML1), "XML");
     if (!resource)
     {
-        log(log_level::error, "Failed to find the XML resource.");
+        auto gle = GetLastError();
+        log(log_level::error, "Failed to find the XML resource:");
+        error::windows(log_level::error, gle);
         return 1;
     }
 
     auto global = LoadResource(NULL, resource);
     if (!global)
     {
-        log(log_level::error, "Failed to load the XML resource.");
+        auto gle = GetLastError();
+        log(log_level::error, "Failed to load the XML resource:");
+        error::windows(log_level::error, gle);
         return 1;
     }
 
     auto pointer = LockResource(global);
     if (!pointer)
     {
-        log(log_level::error, "Failed to lock the XML resource.");
+        auto gle = GetLastError();
+        log(log_level::error, "Failed to lock the XML resource:");
+        error::windows(log_level::error, gle);
         return 1;
     }
 
     auto xml_len = SizeofResource(NULL, resource);
     if (!xml_len)
     {
-        log(log_level::error, "Failed to get the size of the XML resource.");
+        auto gle = GetLastError();
+        log(log_level::error, "Failed to get the size of the XML resource:");
+        error::windows(log_level::error, gle);
         return 1;
     }
 
@@ -367,8 +383,8 @@ int tmfwsi::main::init_curl()
     CURLcode res = curl_easy_perform(curl);
     if (res)
     {
-        log(log_level::error, "Failed to perform the network transfer.");
-        error::curl(res);
+        log(log_level::error, "Failed to perform the network transfer:");
+        error::curl(log_level::error, res);
         return 1;
     }
 
@@ -376,8 +392,8 @@ int tmfwsi::main::init_curl()
     res = curl_easy_getinfo(curl, CURLINFO_PRIMARY_IP, &primary_ip);
     if (res)
     {
-        log(log_level::error, "Failed to get the IP address.");
-        error::curl(res);
+        log(log_level::error, "Failed to get the IP address:");
+        error::curl(log_level::error, res);
         return 1;
     }
 
@@ -407,8 +423,8 @@ int tmfwsi::main::generate_ssl_certificate()
     x509 = X509_new();
     if (!x509)
     {
-        log(log_level::error, "Failed to generate X509 certificate structure. The following errors occurred:");
-        error::openssl();
+        log(log_level::error, "Failed to generate X509 certificate structure:");
+        error::openssl(log_level::error);
         return 1;
     }
 
@@ -473,17 +489,17 @@ int tmfwsi::main::generate_ssl_certificate()
 
 int tmfwsi::main::do_hosts()
 {
-    log(log_level::info, "Modifying and backing up 'hosts' file...");
+    log(log_level::info, "Modifying and backing up the 'hosts' file...");
 
     auto e_tmfwsi = tmfwsi::run("-do-hosts");
     if (e_tmfwsi)
     {
-        auto e = error::parse(e_tmfwsi);
-        log(log_level::error, std::format("{}: {} (Code: {})", error::cause_name(e_tmfwsi), error::last(e).message(), e));
+        log(log_level::error, std::format("{} failed:", error::cause_name(e_tmfwsi)));
+        error::windows(log_level::error, error::parse(e_tmfwsi));
         return 1;
     }
 
-    log(log_level::info, "'hosts' file modified and backed up - it will be reverted once the program shuts down.");
+    log(log_level::info, "The 'hosts' file has been modified and backed up - it will be reverted once the program shuts down.");
 	return 0;
 }
 
@@ -607,8 +623,8 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
     CURLcode res = curl_easy_perform(curl);
     if (res)
     {
-        log(log_level::warn, "Failed to perform the network transfer.");
-        error::curl(res);
+        log(log_level::warn, "Failed to perform the network transfer:");
+        error::curl(log_level::warn, res);
         reset_curl(slist);
         return;
     }
@@ -633,10 +649,9 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
         // HACK: If the TMFWS wants to redirect us to the Player Page in the Manialink browser, we need to tell the user to log in through their web browser first
         // TODO: Find out why this is broken, I assume this is on TMFWSI's end but there is a possibility this could be on Nadeo's end as well, no idea
         const char* const player_page = "https://players.trackmaniaforever.com/";
-        if (!strcmp(header->name, "Location") &&
-            !strncmp(header->value, player_page, strlen(player_page)) &&
-            request.has_header("User-Agent") &&
-            request.get_header_value("User-Agent") == "GameBox")
+        bool is_user_agent_gamebox = request.has_header("User-Agent") && request.get_header_value("User-Agent") == "GameBox";
+
+        if (!strcmp(header->name, "Location") && !strncmp(header->value, player_page, strlen(player_page)) && is_user_agent_gamebox)
         {
             response.headers.clear();
             response.status = 200; // OK
@@ -676,8 +691,8 @@ int tmfwsi::main::undo_hosts()
     auto e_tmfwsi = tmfwsi::run("-undo-hosts");
     if (e_tmfwsi)
     {
-        auto e = error::parse(e_tmfwsi);
-        log(log_level::error, std::format("{}: {} (Code: {})", error::cause_name(e_tmfwsi), error::last(e).message(), e));
+        log(log_level::error, std::format("{} failed:", error::cause_name(e_tmfwsi)));
+        error::windows(log_level::error, error::parse(e_tmfwsi));
         return 1;
     }
 
