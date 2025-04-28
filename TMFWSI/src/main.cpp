@@ -24,6 +24,18 @@ int main()
         return tmfwsi::main::cleanup(result);
     }
 
+    result = tmfwsi::main::init_resource();
+    if (result)
+    {
+        return tmfwsi::main::cleanup(result);
+    }
+
+    result = tmfwsi::main::init_curl();
+    if (result)
+    {
+        return tmfwsi::main::cleanup(result);
+    }
+
     if (!strstr(cmdline, "-no-update"))
     {
         result = tmfwsi::main::update_check();
@@ -33,13 +45,7 @@ int main()
         }
     }
 
-    result = tmfwsi::main::init_resource();
-    if (result)
-    {
-        return tmfwsi::main::cleanup(result);
-    }
-
-    result = tmfwsi::main::init_curl();
+    result = tmfwsi::main::get_tmfws_ip();
     if (result)
     {
         return tmfwsi::main::cleanup(result);
