@@ -69,6 +69,14 @@ DWORD tmfwsi::error::parse(DWORD e_tmfwsi)
 
 const char* tmfwsi::error::cause_name(int e_tmfwsi)
 {
+    constexpr auto unknown_cause = "(unknown)";
+
+    // If the customer bit isn't set, this is already a Windows error, thus there is no known cause
+    if ((e_tmfwsi & customer) == 0)
+    {
+        return unknown_cause;
+    }
+
     auto f = (e_tmfwsi & cause::_mask) >> cause::_bits;
 
     switch ((cause)f)
@@ -79,7 +87,7 @@ const char* tmfwsi::error::cause_name(int e_tmfwsi)
         case delete_file: return "DeleteFile";
         case copy_file: return "CopyFile";
         case std_ofstream: return "std::ofstream";
-        default: return "(unknown)";
+        default: return unknown_cause;
     }
 }
 
