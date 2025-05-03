@@ -1,5 +1,7 @@
 #include "tmfwsi.h"
 
+#define MAIN_PROC(func) do { auto result = func; if (result) return tmfwsi::main::cleanup(result); } while (false)
+
 int main()
 {
     auto cmdline = GetCommandLineA();
@@ -18,68 +20,30 @@ int main()
         tmfwsi::debug = strstr(cmdline, "-debug");
     }
 
-    auto result = tmfwsi::main::init_console();
-    if (result)
-    {
-        return tmfwsi::main::cleanup(result);
-    }
-
-    result = tmfwsi::main::init_resource();
-    if (result)
-    {
-        return tmfwsi::main::cleanup(result);
-    }
-
-    result = tmfwsi::main::init_curl();
-    if (result)
-    {
-        return tmfwsi::main::cleanup(result);
-    }
+    MAIN_PROC(tmfwsi::main::init_console());
+    MAIN_PROC(tmfwsi::main::init_mutex());
+    MAIN_PROC(tmfwsi::main::init_resource());
+    MAIN_PROC(tmfwsi::main::init_curl());
 
     if (!strstr(cmdline, "-no-update"))
     {
-        result = tmfwsi::main::update_check();
-        if (result)
-        {
-            return tmfwsi::main::cleanup(result);
-        }
+        MAIN_PROC(tmfwsi::main::update_check());
     }
 
-    result = tmfwsi::main::get_tmfws_ip();
-    if (result)
-    {
-        return tmfwsi::main::cleanup(result);
-    }
-
-    result = tmfwsi::main::generate_ssl_certificate();
-    if (result)
-    {
-        return tmfwsi::main::cleanup(result);
-    }
+    MAIN_PROC(tmfwsi::main::get_tmfws_ip());
+    MAIN_PROC(tmfwsi::main::generate_ssl_certificate());
 
     bool hosts_enabled = !strstr(cmdline, "-no-hosts");
     if (hosts_enabled)
     {
-        result = tmfwsi::main::do_hosts();
-        if (result)
-        {
-            return tmfwsi::main::cleanup(result);
-        }
+        MAIN_PROC(tmfwsi::main::do_hosts());
     }
 
-    result = tmfwsi::main::ssl_server::loop();
-    if (result)
-    {
-        return tmfwsi::main::cleanup(result);
-    }
+    MAIN_PROC(tmfwsi::main::ssl_server::loop());
 
     if (hosts_enabled)
     {
-        result = tmfwsi::main::undo_hosts();
-        if (result)
-        {
-            return tmfwsi::main::cleanup(result);
-        }
+        MAIN_PROC(tmfwsi::main::undo_hosts());
     }
 
     return tmfwsi::main::cleanup(0);

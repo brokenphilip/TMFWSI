@@ -26,6 +26,8 @@
 
 namespace tmfwsi
 {
+	inline HANDLE mutex = nullptr;
+
 	inline char ip[16] = { 0 };
 
 	inline std::string xml = "";
@@ -117,6 +119,7 @@ namespace tmfwsi
 
 	namespace main
 	{
+		int init_mutex();
 		int init_console();
 		int init_resource();
 		int init_curl();

@@ -287,6 +287,27 @@ size_t tmfwsi::curl_writefn::string(void* buffer, size_t size, size_t n_items, s
     return size * n_items;
 }
 
+int tmfwsi::main::init_mutex()
+{
+    auto mtx = CreateMutexA(NULL, TRUE, "Global\\TMFWSI");
+    auto gle = GetLastError();
+
+    if (!mtx)
+    {
+        log(log_level::error, "Failed to create mutex:");
+        error::windows(log_level::error, gle);
+        return 1;
+    }
+    else if (gle == ERROR_ALREADY_EXISTS)
+    {
+        log(log_level::error, "TMFWSI is already running - you may only run one instace of TMFWSI at a time.");
+        return 1;
+    }
+
+    mutex = mtx;
+    return 0;
+}
+
 int tmfwsi::main::init_console()
 {
     SetConsoleTitleA(TMFWSI " " TMFWSI_VERSION);
@@ -774,8 +795,14 @@ int tmfwsi::main::undo_hosts()
 
 int tmfwsi::main::cleanup(int status)
 {
-    log(log_level::info, std::format("TMFWSI is shutting down... Status: {}", (status ? "FAIL" : "OK")));
+    log(log_level::info, std::format("TMFWSI is shutting down with code {}... Status: {}", status, (status ? "FAIL" : "OK")));
 
+    if (mutex)
+    {
+        ReleaseMutex(mutex);
+        CloseHandle(mutex);
+        mutex = nullptr;
+    }
     if (x509)
     {
         X509_free(x509);
