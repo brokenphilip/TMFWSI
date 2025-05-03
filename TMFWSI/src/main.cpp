@@ -29,6 +29,10 @@ int main()
     {
         MAIN_PROC(tmfwsi::main::update_check());
     }
+    else
+    {
+        tmfwsi::log(tmfwsi::log_level::warn, "Skipping update check due to launch parameter - please check for important TMFWSI updates manually on GitHub.");
+    }
 
     MAIN_PROC(tmfwsi::main::get_tmfws_ip());
     MAIN_PROC(tmfwsi::main::generate_ssl_certificate());
@@ -37,6 +41,10 @@ int main()
     if (hosts_enabled)
     {
         MAIN_PROC(tmfwsi::main::do_hosts());
+    }
+    else
+    {
+        tmfwsi::log(tmfwsi::log_level::warn, "Skipping hosts file modification due to launch parameter.");
     }
 
     MAIN_PROC(tmfwsi::main::ssl_server::loop());
