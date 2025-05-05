@@ -723,7 +723,7 @@ int tmfwsi::main::ssl_server::loop()
 
         return 0;
     }
-    server->Get(R"(.*)", ssl_server::get);
+    server->Get(R"(.*)", get);
 
     log(log_level::info, std::format("SSL Server started - listening to requests on {}:443...", server_ip));
     server->listen_after_bind();
