@@ -209,6 +209,17 @@ int tmfwsi::main_undo_hosts()
     return 0;
 }
 
+size_t tmfwsi::curl_writefn::dummy(void* buffer, size_t size, size_t n_items, void* unused)
+{
+    return size * n_items;
+}
+
+size_t tmfwsi::curl_writefn::string(void* buffer, size_t size, size_t n_items, std::string* str)
+{
+    str->append(static_cast<char*>(buffer), size * n_items);
+    return size * n_items;
+}
+
 tmfwsi::error::error_t tmfwsi::main::run(const char* args)
 {
     char exe[MAX_PATH] = { 0 };
@@ -293,6 +304,9 @@ tmfwsi::error::error_t tmfwsi::main::run(std::string const& args)
 
 void tmfwsi::main::log(log_level ll, std::string const& str)
 {
+    static std::mutex mtx;
+    std::lock_guard lg(mtx);
+
     if (ll == log_level::debug && !(logging == log_mode::verbose || debug))
     {
         return;
@@ -381,15 +395,26 @@ void tmfwsi::main::windows_log(log_level ll, DWORD gle)
     log(ll, std::format("{} (Code: {})", error::last(gle).message(), gle));
 }
 
-size_t tmfwsi::curl_writefn::dummy(void* buffer, size_t size, size_t n_items, void* unused)
+int tmfwsi::main::curl_debug(CURL* handle, curl_infotype it, char* data, size_t size, void* clientp)
 {
-    return size * n_items;
-}
+    std::string prefix;
 
-size_t tmfwsi::curl_writefn::string(void* buffer, size_t size, size_t n_items, std::string* str)
-{
-    str->append(static_cast<char*>(buffer), size * n_items);
-    return size * n_items;
+    switch (it)
+    {
+        case CURLINFO_TEXT: prefix = " T  E  X  T ";
+        case CURLINFO_HEADER_IN: prefix = "  HEADER_IN ";
+        case CURLINFO_HEADER_OUT: prefix = " HEADER_OUT ";
+        case CURLINFO_DATA_IN: prefix = "   DATA_IN  ";
+        case CURLINFO_DATA_OUT: prefix = "  DATA_OUT  ";
+        case CURLINFO_SSL_DATA_IN: prefix = " SSL_DATA_IN";
+        case CURLINFO_SSL_DATA_OUT: prefix = "SSL_DATA_OUT";
+        case CURLINFO_END: prefix = "  E   N   D ";
+        default: prefix = "            ";
+    }
+
+    std::string err(data, size);
+    log(log_level::debug, std::format("(cURL debug {}) {}", prefix, err));
+    return 0;
 }
 
 int tmfwsi::main::init_console_and_logging()
@@ -757,6 +782,12 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
         params += "=";
         params += it.second;
         first = false;
+    }
+
+    if (debug || logging == log_mode::verbose)
+    {
+        curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+        curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, curl_debug);
     }
 
     std::string url = "https://" + server_ip + request.path + params;

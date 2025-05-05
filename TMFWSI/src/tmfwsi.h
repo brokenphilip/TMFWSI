@@ -155,6 +155,8 @@ namespace tmfwsi
 		void openssl_log(log_level ll);
 		void windows_log(log_level ll, DWORD gle);
 
+		int curl_debug(CURL* handle, curl_infotype it, char* data, size_t size, void* clientp);
+
 		int init_console_and_logging();
 		int init_mutex();
 		int init_resource();
