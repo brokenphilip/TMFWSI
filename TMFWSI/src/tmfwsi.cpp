@@ -209,7 +209,7 @@ int tmfwsi::main_undo_hosts()
     return 0;
 }
 
-DWORD tmfwsi::main::run(const char* args)
+tmfwsi::error::error_t tmfwsi::main::run(const char* args)
 {
     char exe[MAX_PATH] = { 0 };
     GetModuleFileNameA(NULL, exe, MAX_PATH);
@@ -286,7 +286,7 @@ DWORD tmfwsi::main::run(const char* args)
     return result;
 }
 
-DWORD tmfwsi::main::run(std::string const& args)
+tmfwsi::error::error_t tmfwsi::main::run(std::string const& args)
 {
     return run(args.c_str());
 }
