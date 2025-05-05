@@ -20,31 +20,7 @@ const char* tmfwsi::error::last::message()
     return msg ? msg : "Unknown error - FormatMessageA failed.";
 }
 
-void tmfwsi::error::curl(log_level ll, CURLcode c)
-{
-    log(ll, std::format("{} (CURLcode: {})", curl_easy_strerror(c), (int)c));
-}
-
-void tmfwsi::error::openssl(log_level ll)
-{
-    unsigned long e = 0L;
-
-    for (int i = 1; e = ERR_get_error(); i++)
-    {
-        auto error = ERR_error_string(e, nullptr);
-        auto lib = ERR_lib_error_string(e);
-        auto reason = ERR_reason_error_string(e);
-
-        log(ll, std::format("{}. [{}] {} (lib: {}) (reason: {})", i, e, error, lib, reason));
-    }
-}
-
-void tmfwsi::error::windows(log_level ll, DWORD gle)
-{
-    log(ll, std::format("{} (Code: {})", error::last(gle).message(), gle));
-}
-
-DWORD tmfwsi::error::make(DWORD e, cause f)
+tmfwsi::error::error_t tmfwsi::error::make(DWORD e, cause f)
 {
     // If our cause bits are already taken by a legitimate Windows error, do nothing...
     // As far as I'm aware, this should never happen, but if it does, it's better to know the correct error than mistakenly erase it.
@@ -56,7 +32,7 @@ DWORD tmfwsi::error::make(DWORD e, cause f)
     return e | customer | (f << cause::_bits);
 }
 
-DWORD tmfwsi::error::parse(DWORD e_tmfwsi)
+DWORD tmfwsi::error::parse(error_t e_tmfwsi)
 {
     // If the customer bit isn't set, this is already a Windows error
     if ((e_tmfwsi & customer) == 0)
@@ -67,7 +43,7 @@ DWORD tmfwsi::error::parse(DWORD e_tmfwsi)
     return e_tmfwsi & ~(customer) & ~(cause::_mask);
 }
 
-const char* tmfwsi::error::cause_name(int e_tmfwsi)
+const char* tmfwsi::error::cause_name(error_t e_tmfwsi)
 {
     constexpr auto unknown_cause = "(unknown)";
 
@@ -86,12 +62,154 @@ const char* tmfwsi::error::cause_name(int e_tmfwsi)
         case get_exit_code_process: return "GetExitCodeProcess";
         case delete_file: return "DeleteFile";
         case copy_file: return "CopyFile";
-        case std_ofstream: return "std::ofstream";
+        case create_file: return "CreateFile";
+        case write_file: return "WriteFile";
         default: return unknown_cause;
     }
 }
 
-DWORD tmfwsi::run(LPCSTR args)
+tmfwsi::file::writer::writer(const char* file)
+{
+    handle = CreateFileA(file, FILE_APPEND_DATA, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    create_file_gle = GetLastError();
+
+    if (handle == INVALID_HANDLE_VALUE && create_file_gle == ERROR_ACCESS_DENIED)
+    {
+        auto perms = check_permissions(file);
+        if (perms)
+        {
+            create_file_gle = perms;
+        }
+    }
+}
+
+tmfwsi::file::writer::~writer()
+{
+    if (handle != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(handle);
+    }
+}
+
+tmfwsi::error::error_t tmfwsi::file::writer::write(const char* str, DWORD len)
+{
+    if (handle == INVALID_HANDLE_VALUE)
+    {
+        return error::make(create_file_gle, error::cause::create_file);
+    }
+
+    DWORD written = 0;
+    if (!WriteFile(handle, str, len, &written, NULL))
+    {
+        return error::make(GetLastError(), error::cause::write_file);
+    }
+
+    if (len != written)
+    {
+        return error::make(ERROR_MORE_DATA, error::cause::write_file);
+    }
+
+    return 0;
+}
+
+tmfwsi::error::error_t tmfwsi::file::writer::write(std::string const& str)
+{
+    return write(str.c_str(), str.length());
+}
+
+DWORD tmfwsi::file::check_permissions(const char* file)
+{
+    auto attribs = GetFileAttributesA(file);
+    if (attribs == INVALID_FILE_ATTRIBUTES)
+    {
+        return GetLastError();
+    }
+
+    if (attribs & FILE_ATTRIBUTE_DIRECTORY)
+    {
+        return ERROR_DIRECTORY_NOT_SUPPORTED;
+    }
+    else if (attribs & FILE_ATTRIBUTE_READONLY)
+    {
+        return ERROR_FILE_READ_ONLY;
+    }
+    else if (attribs & FILE_ATTRIBUTE_SYSTEM)
+    {
+        return ERROR_NOT_ALLOWED_ON_SYSTEM_FILE;
+    }
+
+    return 0;
+}
+
+DWORD tmfwsi::file::check_permissions(fs::path path)
+{
+    return check_permissions(path.string().c_str());
+}
+
+int tmfwsi::main_do_hosts()
+{
+    auto bak_str = (file::exe_path / "hosts.tmfwsi_bak").string();
+    auto bak = bak_str.c_str();
+
+    auto attribs = file::check_permissions(bak);
+    if (attribs)
+    {
+        return error::make(attribs, error::cause::delete_file);
+    }
+
+    // Delete the old backup file, if any
+    if (!DeleteFileA(bak))
+    {
+        auto gle = GetLastError();
+
+        // If the file wasn't found, we don't care. If deletion failed for any other reason though, bail
+        if (gle != ERROR_FILE_NOT_FOUND)
+        {
+            return error::make(gle, error::cause::delete_file);
+        }
+    }
+
+    // Make a backup of the hosts file
+    if (!CopyFileA(HOSTS, bak, true))
+    {
+        return error::make(GetLastError(), error::cause::copy_file);
+    }
+
+    {
+        file::writer fw(HOSTS);
+
+        auto result = fw.write(std::format("\r\n\r\n" "// " TMFWSI "\r\n" "{}" "\t" "ws.trackmania.com", server_ip));
+        if (result)
+        {
+            return result;
+        }
+    }
+
+    return 0;
+}
+
+int tmfwsi::main_undo_hosts()
+{
+    auto bak_str = (file::exe_path / "hosts.tmfwsi_bak").string();
+    auto bak = bak_str.c_str();
+
+    auto attribs = file::check_permissions(bak);
+    if (attribs)
+    {
+        return error::make(attribs, error::cause::copy_file);
+    }
+
+    // Replace the 'hosts' file with our backup.
+    if (!CopyFileA(bak, HOSTS, false))
+    {
+        return error::make(GetLastError(), error::cause::copy_file);
+    }
+
+    // We don't erase the backup here, in case the user needs it for whatever reason
+    return 0;
+}
+
+DWORD tmfwsi::main::run(const char* args)
 {
     char exe[MAX_PATH] = { 0 };
     GetModuleFileNameA(NULL, exe, MAX_PATH);
@@ -117,25 +235,25 @@ DWORD tmfwsi::run(LPCSTR args)
 
     if (!executed)
     {
-        if (gle != S_OK)
+        if (gle)
         {
             return error::make(gle, error::cause::shell_execute_ex);
         }
 
         switch ((int)sexi.hInstApp)
         {
-            case SE_ERR_FNF:                return ERROR_FILE_NOT_FOUND;
-            case SE_ERR_PNF:                return ERROR_PATH_NOT_FOUND;
-            case SE_ERR_ACCESSDENIED:       return ERROR_ACCESS_DENIED;
-            case SE_ERR_OOM:                return ERROR_OUTOFMEMORY;
-            case SE_ERR_DLLNOTFOUND:        return ERROR_DLL_NOT_FOUND;
-            case SE_ERR_SHARE:              return ERROR_SHARING_VIOLATION;
-            case SE_ERR_ASSOCINCOMPLETE:    return ERROR_NO_ASSOCIATION;
-            case SE_ERR_DDETIMEOUT:         return ERROR_DDE_FAIL;
-            case SE_ERR_DDEFAIL:            return ERROR_DDE_FAIL;
-            case SE_ERR_DDEBUSY:            return ERROR_DDE_FAIL;
-            case SE_ERR_NOASSOC:            return ERROR_NO_ASSOCIATION;
-            default:                        return ERROR_UNIDENTIFIED_ERROR;
+            case SE_ERR_FNF:                return error::make(ERROR_FILE_NOT_FOUND, error::cause::shell_execute_ex);
+            case SE_ERR_PNF:                return error::make(ERROR_PATH_NOT_FOUND, error::cause::shell_execute_ex);
+            case SE_ERR_ACCESSDENIED:       return error::make(ERROR_ACCESS_DENIED, error::cause::shell_execute_ex);
+            case SE_ERR_OOM:                return error::make(ERROR_OUTOFMEMORY, error::cause::shell_execute_ex);
+            case SE_ERR_DLLNOTFOUND:        return error::make(ERROR_DLL_NOT_FOUND, error::cause::shell_execute_ex);
+            case SE_ERR_SHARE:              return error::make(ERROR_SHARING_VIOLATION, error::cause::shell_execute_ex);
+            case SE_ERR_ASSOCINCOMPLETE:    return error::make(ERROR_NO_ASSOCIATION, error::cause::shell_execute_ex);
+            case SE_ERR_DDETIMEOUT:         return error::make(ERROR_DDE_FAIL, error::cause::shell_execute_ex);
+            case SE_ERR_DDEFAIL:            return error::make(ERROR_DDE_FAIL, error::cause::shell_execute_ex);
+            case SE_ERR_DDEBUSY:            return error::make(ERROR_DDE_FAIL, error::cause::shell_execute_ex);
+            case SE_ERR_NOASSOC:            return error::make(ERROR_NO_ASSOCIATION, error::cause::shell_execute_ex);
+            default:                        return error::make(ERROR_UNIDENTIFIED_ERROR, error::cause::shell_execute_ex);
         }
     }
 
@@ -161,119 +279,106 @@ DWORD tmfwsi::run(LPCSTR args)
         {
             return error::make(GetLastError(), error::cause::get_exit_code_process);
         }
-    } 
+    }
     while (result == STILL_ACTIVE);
 
+    // The (un)do_hosts() subroutines already error::make() for us
     return result;
 }
 
-void tmfwsi::log(log_level ll, std::string str)
+DWORD tmfwsi::main::run(std::string const& args)
 {
-    if (ll == log_level::debug && !debug)
+    return run(args.c_str());
+}
+
+void tmfwsi::main::log(log_level ll, std::string const& str)
+{
+    if (ll == log_level::debug && !(logging == log_mode::verbose || debug))
     {
         return;
     }
 
     SYSTEMTIME time;
     GetLocalTime(&time);
-    std::string prefix = std::format("[{:02d}:{:02d}:{:02d} ", time.wHour, time.wMinute, time.wSecond);
+    std::string time_str = std::format("{:02d}:{:02d}:{:02d}", time.wHour, time.wMinute, time.wSecond);
+
+    std::string prefix;
+    switch (ll)
+    {
+        case log_level::warn: prefix = " WARN"; break;
+        case log_level::error: prefix = "ERROR"; break;
+        case log_level::debug: prefix = "DEBUG"; break;
+        default: prefix = " INFO"; break;
+    }
+
+    // If logging is enabled, and either (1) it's not a debug log, or (2) it is a debug log, but we are also verbose logging as well
+    if (logging != log_mode::off && (ll != log_level::debug || (ll == log_level::debug && logging == log_mode::verbose)))
+    {
+        auto month_str = +[](WORD month)
+        {
+            switch (month)
+            {
+                case 1: return "Jan";
+                case 2: return "Feb";
+                case 3: return "Mar";
+                case 4: return "Apr";
+                case 5: return "May";
+                case 6: return "Jun";
+                case 7: return "Jul";
+                case 8: return "Aug";
+                case 9: return "Sep";
+                case 10: return "Oct";
+                case 11: return "Nov";
+                case 12: return "Dec";
+                default: return "???";
+            }
+        };
+
+        std::string date_str = std::format("{:02d}-{}-{:02d}", time.wDay, month_str(time.wMonth), time.wYear % 100);
+
+        logger->write(std::format("[{} {} {}] {}\r\n", date_str, time_str, prefix, str));
+    }
+
+    if (ll == log_level::debug && !debug)
+    {
+        return;
+    }
 
     switch (ll)
     {
-        case log_level::warn: prefix += "\x1B[93m WARN\x1B[0m]"; break;
-        case log_level::error: prefix += "\x1B[91mERROR\x1B[0m]"; break;
-        case log_level::debug: prefix += "\x1B[95mDEBUG\x1B[0m]"; break;
-        default: prefix += "\x1B[97m INFO\x1B[0m]"; break;
+        case log_level::warn: prefix.insert(0, "\x1B[93m"); break;
+        case log_level::error: prefix.insert(0, "\x1B[91m"); break;
+        case log_level::debug: prefix.insert(0, "\x1B[95m"); break;
+        default: prefix.insert(0, "\x1B[97m"); break;
     }
 
-    std::cout << prefix << " " << str << std::endl;
+    prefix += "\x1B[0m";
+
+    std::cout << "[" << time_str << " " << prefix << "] " << str << std::endl;
 }
 
-namespace fs = std::filesystem;
-
-int tmfwsi::main_do_hosts()
+void tmfwsi::main::curl_log(log_level ll, CURLcode c)
 {
-    // Calculate the path to the backup file
-    char path[MAX_PATH] = { 0 };
-    GetModuleFileNameA(NULL, path, MAX_PATH);
-
-    fs::path path_fs = path;
-    fs::path bak_fs = path_fs.parent_path() / "hosts.tmfwsi_bak";
-    
-    auto bak_str = bak_fs.string();
-    auto bak = bak_str.c_str();
-
-    // I will be very sad if you make a directory called "hosts.tmfwsi_bak"
-    auto attribs = GetFileAttributesA(bak);
-    if (attribs != INVALID_FILE_ATTRIBUTES && attribs & FILE_ATTRIBUTE_DIRECTORY)
-    {
-        return error::make(ERROR_DIRECTORY_NOT_SUPPORTED, error::cause::delete_file);
-    }
-
-    // Delete the old backup file, if any
-    if (!DeleteFileA(bak))
-    {
-        auto gle = GetLastError();
-
-        // If the file wasn't found, we don't care. If deletion failed for any other reason though, bail
-        if (gle != ERROR_FILE_NOT_FOUND)
-        {
-            return error::make(gle, error::cause::delete_file);
-        }
-    }
-
-    // Make a backup of the hosts file
-    if (!CopyFileA(HOSTS, bak, true))
-    {
-        return error::make(GetLastError(), error::cause::copy_file);
-    }
-
-    // Modify the hosts file - make sure our local address replaces the Web Services
-    std::ofstream out;
-    out.open(HOSTS, std::ios::app);
-    if (!out.is_open())
-    {
-        out.close();
-        return error::make(ERROR_FILE_READ_ONLY, error::cause::std_ofstream);
-    }
-
-    if (!(out << "\n\n" "// " TMFWSI "\n" DEFAULT_ADDRESS "\t" "ws.trackmania.com"))
-    {
-        out.close();
-        return error::make(ERROR_WRITE_PROTECT, error::cause::std_ofstream);
-    }
-
-    out.close();
-    return S_OK;
+    log(ll, std::format("{} (CURLcode: {})", curl_easy_strerror(c), (int)c));
 }
 
-int tmfwsi::main_undo_hosts()
+void tmfwsi::main::openssl_log(log_level ll)
 {
-    // Calculate the path to the backup file
-    char path[MAX_PATH] = { 0 };
-    GetModuleFileNameA(NULL, path, MAX_PATH);
+    unsigned long e = 0L;
 
-    fs::path path_fs = path;
-    fs::path bak_fs = path_fs.parent_path() / "hosts.tmfwsi_bak";
-
-    auto bak_str = bak_fs.string();
-    auto bak = bak_str.c_str();
-
-    // I will be very sad if you make a directory called "hosts.tmfwsi_bak"
-    auto attribs = GetFileAttributesA(bak);
-    if (attribs != INVALID_FILE_ATTRIBUTES && attribs & FILE_ATTRIBUTE_DIRECTORY)
+    for (int i = 1; e = ERR_get_error(); i++)
     {
-        return error::make(ERROR_DIRECTORY_NOT_SUPPORTED, error::cause::delete_file);
-    }
+        auto error = ERR_error_string(e, nullptr);
+        auto lib = ERR_lib_error_string(e);
+        auto reason = ERR_reason_error_string(e);
 
-    // Replace the 'hosts' file with our backup.
-    if (!CopyFileA(bak, HOSTS, false))
-    {
-        return error::make(GetLastError(), error::cause::copy_file);
+        log(ll, std::format("{}. [{}] {} (lib: {}) (reason: {})", i, e, error, lib, reason));
     }
+}
 
-    // We don't erase the backup here, in case the user needs it for whatever reason
-    return S_OK;
+void tmfwsi::main::windows_log(log_level ll, DWORD gle)
+{
+    log(ll, std::format("{} (Code: {})", error::last(gle).message(), gle));
 }
 
 size_t tmfwsi::curl_writefn::dummy(void* buffer, size_t size, size_t n_items, void* unused)
@@ -287,6 +392,45 @@ size_t tmfwsi::curl_writefn::string(void* buffer, size_t size, size_t n_items, s
     return size * n_items;
 }
 
+int tmfwsi::main::init_console_and_logging()
+{
+    SetConsoleTitleA(TMFWSI " " TMFWSI_VERSION);
+
+    auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD mode;
+    GetConsoleMode(handle, &mode);
+    SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN);
+
+    error::error_t result = 0;
+    if (logging != log_mode::off)
+    {
+        logger = new file::writer(file::exe_path / "tmfwsi.log");
+        result = logger->write("\r\n\r\n\r\n");
+        if (result)
+        {
+            delete logger;
+            logger = nullptr;
+            logging = log_mode::off;
+        }
+    }
+
+    auto curl_version = curl_version_info(CURLVERSION_NOW)->version;
+    log(log_level::info, "----------");
+    log(log_level::info, TMFWSI " " TMFWSI_VERSION " by brokenphilip");
+    log(log_level::info, std::format("Compiled with 'cURL {}', '" OPENSSL_VERSION_TEXT "' and 'zlib " ZLIB_VERSION "'.", curl_version));
+    log(log_level::info, "For more information and troubleshooting, please visit: https://github.com/brokenphilip/TMFWSI");
+    log(log_level::info, "----------");
+
+    log(log_level::debug, "Debug mode enabled.");
+
+    if (result)
+    {
+        log(log_level::warn, std::format("Logging to file disabled - {} failed:", error::cause_name(result)));
+        windows_log(log_level::warn, error::parse(result));
+    }
+    return 0;
+}
+
 int tmfwsi::main::init_mutex()
 {
     auto mtx = CreateMutexA(NULL, TRUE, "Global\\TMFWSI");
@@ -295,7 +439,7 @@ int tmfwsi::main::init_mutex()
     if (!mtx)
     {
         log(log_level::error, "Failed to create mutex:");
-        error::windows(log_level::error, gle);
+        windows_log(log_level::error, gle);
         return 1;
     }
     else if (gle == ERROR_ALREADY_EXISTS)
@@ -308,51 +452,6 @@ int tmfwsi::main::init_mutex()
     return 0;
 }
 
-int tmfwsi::main::init_console()
-{
-    SetConsoleTitleA(TMFWSI " " TMFWSI_VERSION);
-
-    auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (handle == INVALID_HANDLE_VALUE)
-    {
-        auto gle = GetLastError();
-        log(log_level::error, "Failed to get the standard output handle:");
-        error::windows(log_level::error, gle);
-        return 1;
-    }
-    else if (!handle)
-    {
-        log(log_level::error, "No standard output handle was found.");
-        return 1;
-    }
-
-    DWORD mode;
-    if (!GetConsoleMode(handle, &mode))
-    {
-        auto gle = GetLastError();
-        log(log_level::error, "Failed to get the console mode:");
-        error::windows(log_level::error, gle);
-        return 1;
-    }
-
-    if (!SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN))
-    {
-        auto gle = GetLastError();
-        log(log_level::error, "Failed to set the console mode:");
-        error::windows(log_level::error, gle);
-        return 1;
-    }
-
-    log(log_level::info, "----------");
-    log(log_level::info, TMFWSI " " TMFWSI_VERSION " by brokenphilip");
-    log(log_level::info, std::format("Compiled with 'cURL {}', '" OPENSSL_VERSION_TEXT "' and 'zlib " ZLIB_VERSION "'.", curl_version_info(CURLVERSION_NOW)->version));
-    log(log_level::info, "For more information and troubleshooting, please visit: https://github.com/brokenphilip/TMFWSI");
-    log(log_level::info, "----------");
-
-    log(log_level::debug, "Debug mode enabled.");
-    return 0;
-}
-
 int tmfwsi::main::init_resource()
 {
     auto resource = FindResourceA(NULL, MAKEINTRESOURCE(IDR_XML1), "XML");
@@ -360,7 +459,7 @@ int tmfwsi::main::init_resource()
     {
         auto gle = GetLastError();
         log(log_level::error, "Failed to find the XML resource:");
-        error::windows(log_level::error, gle);
+        windows_log(log_level::error, gle);
         return 1;
     }
 
@@ -369,7 +468,7 @@ int tmfwsi::main::init_resource()
     {
         auto gle = GetLastError();
         log(log_level::error, "Failed to load the XML resource:");
-        error::windows(log_level::error, gle);
+        windows_log(log_level::error, gle);
         return 1;
     }
 
@@ -378,7 +477,7 @@ int tmfwsi::main::init_resource()
     {
         auto gle = GetLastError();
         log(log_level::error, "Failed to lock the XML resource:");
-        error::windows(log_level::error, gle);
+        windows_log(log_level::error, gle);
         return 1;
     }
 
@@ -387,7 +486,7 @@ int tmfwsi::main::init_resource()
     {
         auto gle = GetLastError();
         log(log_level::error, "Failed to get the size of the XML resource:");
-        error::windows(log_level::error, gle);
+        windows_log(log_level::error, gle);
         return 1;
     }
 
@@ -403,7 +502,6 @@ int tmfwsi::main::init_curl()
         log(log_level::error, "Failed to initialize cURL.");
         return 1;
     }
-
     return 0;
 }
 
@@ -425,7 +523,7 @@ int tmfwsi::main::update_check()
     if (res)
     {
         log(log_level::warn, "Failed to perform the network transfer:");
-        error::curl(log_level::warn, res);
+        curl_log(log_level::warn, res);
         curl_easy_reset(curl);
         return 0;
     }
@@ -472,7 +570,7 @@ int tmfwsi::main::get_tmfws_ip()
     if (res)
     {
         log(log_level::error, "Failed to perform the network transfer:");
-        error::curl(log_level::error, res);
+        curl_log(log_level::error, res);
         curl_easy_reset(curl);
         return 1;
     }
@@ -482,7 +580,7 @@ int tmfwsi::main::get_tmfws_ip()
     if (res)
     {
         log(log_level::error, "Failed to get the IP address:");
-        error::curl(log_level::error, res);
+        curl_log(log_level::error, res);
         curl_easy_reset(curl);
         return 1;
     }
@@ -495,7 +593,7 @@ int tmfwsi::main::get_tmfws_ip()
     }
 
     log(log_level::info, std::format("TrackMania Forever Web Services IP address: {}", primary_ip));
-    strcpy_s(ip, primary_ip);
+    strcpy_s(tmfws_ip, primary_ip);
     curl_easy_reset(curl);
     return 0;
 }
@@ -515,7 +613,7 @@ int tmfwsi::main::generate_ssl_certificate()
     if (!x509)
     {
         log(log_level::error, "Failed to generate X509 certificate structure:");
-        error::openssl(log_level::error);
+        openssl_log(log_level::error);
         return 1;
     }
 
@@ -582,11 +680,11 @@ int tmfwsi::main::do_hosts()
 {
     log(log_level::info, "Modifying and backing up the 'hosts' file...");
 
-    auto e_tmfwsi = tmfwsi::run("-do-hosts");
+    auto e_tmfwsi = run(std::format("-do-hosts -ip {}", server_ip));
     if (e_tmfwsi)
     {
         log(log_level::error, std::format("{} failed:", error::cause_name(e_tmfwsi)));
-        error::windows(log_level::error, error::parse(e_tmfwsi));
+        windows_log(log_level::error, error::parse(e_tmfwsi));
         return 1;
     }
 
@@ -596,11 +694,11 @@ int tmfwsi::main::do_hosts()
 
 BOOL WINAPI tmfwsi::main::control_handler(DWORD ctrl)
 {
-    if (!server_stopped && (ctrl == CTRL_C_EVENT || ctrl == CTRL_CLOSE_EVENT))
+    if (!ssl_server::stopped && (ctrl == CTRL_C_EVENT || ctrl == CTRL_CLOSE_EVENT))
     {
-        server_stopped = true;
+        ssl_server::stopped = true;
         log(log_level::warn, "Close or CTRL+C event received - stopping server...");
-        server->stop();
+        ssl_server::server->stop();
         return TRUE;
     }
 
@@ -611,32 +709,31 @@ int tmfwsi::main::ssl_server::loop()
 {
     log(log_level::info, "Starting SSL server...");
 
-    SetConsoleCtrlHandler(&main::control_handler, 1);
+    SetConsoleCtrlHandler(&control_handler, 1);
 
     server = new httplib::SSLServer(x509, pkey);
-    if (!server->bind_to_port(DEFAULT_ADDRESS, 443))
+    if (!server->bind_to_port(server_ip, 443))
     {
-        log(log_level::warn, "SSL server not started - unable to bind to address " DEFAULT_ADDRESS ":443, make sure it is valid and not in use.");
+        log(log_level::warn, std::format("SSL server not started - unable to bind to address {}:443, make sure it is valid and not in use.", server_ip));
 
         delete server;
         server = nullptr;
 
-        SetConsoleCtrlHandler(&main::control_handler, 0);
+        SetConsoleCtrlHandler(&control_handler, 0);
 
         return 0;
     }
     server->Get(R"(.*)", ssl_server::get);
 
-    // TODO: custom address launch parameter
-    log(log_level::info, "SSL Server started - listening to requests on " DEFAULT_ADDRESS ":443...");
+    log(log_level::info, std::format("SSL Server started - listening to requests on {}:443...", server_ip));
     server->listen_after_bind();
 
     delete server;
     server = nullptr;
 
-    SetConsoleCtrlHandler(&main::control_handler, 0);
+    SetConsoleCtrlHandler(&control_handler, 0);
 
-    if (!server_stopped)
+    if (!stopped)
     {
         log(log_level::warn, "Server has been stopped prematurely.");
         return 0;
@@ -662,8 +759,7 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
         first = false;
     }
 
-    std::string ip_str = ip;
-    std::string url = "https://" + ip_str + request.path + params;
+    std::string url = "https://" + server_ip + request.path + params;
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 
     // Enable cookie engine - helps with Manialinks
@@ -702,7 +798,6 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
     //curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
     //curl_easy_setopt(curl, CURLOPT_SSL_OPTIONS, CURLSSLOPT_ALLOW_BEAST | CURLSSLOPT_NO_REVOKE);
 
-
     // Save the result for later
     std::string data;
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_writefn::string);
@@ -715,7 +810,7 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
     if (res)
     {
         log(log_level::warn, "Failed to perform the network transfer:");
-        error::curl(log_level::warn, res);
+        curl_log(log_level::warn, res);
         curl_easy_reset(curl);
         return;
     }
@@ -781,11 +876,11 @@ int tmfwsi::main::undo_hosts()
 {
     log(log_level::info, "Reverting 'hosts' file...");
 
-    auto e_tmfwsi = tmfwsi::run("-undo-hosts");
+    auto e_tmfwsi = run("-undo-hosts");
     if (e_tmfwsi)
     {
         log(log_level::error, std::format("{} failed:", error::cause_name(e_tmfwsi)));
-        error::windows(log_level::error, error::parse(e_tmfwsi));
+        windows_log(log_level::error, error::parse(e_tmfwsi));
         return 1;
     }
 
@@ -797,12 +892,6 @@ int tmfwsi::main::cleanup(int status)
 {
     log(log_level::info, std::format("TMFWSI is shutting down with code {}... Status: {}", status, (status ? "FAIL" : "OK")));
 
-    if (mutex)
-    {
-        ReleaseMutex(mutex);
-        CloseHandle(mutex);
-        mutex = nullptr;
-    }
     if (x509)
     {
         X509_free(x509);
@@ -818,6 +907,16 @@ int tmfwsi::main::cleanup(int status)
         curl_easy_cleanup(curl);
         curl = nullptr;
     }
-
+    if (logger)
+    {
+        delete logger;
+        logger = nullptr;
+    }
+    if (mutex)
+    {
+        ReleaseMutex(mutex);
+        CloseHandle(mutex);
+        mutex = nullptr;
+    }
     return status;
 }

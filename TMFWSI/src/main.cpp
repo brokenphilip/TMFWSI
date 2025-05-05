@@ -5,54 +5,113 @@
 int main()
 {
     auto cmdline = GetCommandLineA();
-    if (strstr(cmdline, "-do-hosts"))
-    {
-        return tmfwsi::main_do_hosts();
-    }
-    else if (strstr(cmdline, "-undo-hosts"))
+
+    if (strstr(cmdline, "-undo-hosts"))
     {
         return tmfwsi::main_undo_hosts();
     }
 
-    // Only if we're not in debug mode already (at compile time)
-    if (!tmfwsi::debug)
+    // Since main_do_hosts() needs to know the IP address, we must parse it here
+    std::string cmdline_str = cmdline;
+    constexpr auto ip_cmd = "-ip ";
+    bool invalid_ip = false;
+    std::string ip = "";
+    
+    auto i = cmdline_str.find(ip_cmd);
+    if (i != std::string::npos)
     {
-        tmfwsi::debug = strstr(cmdline, "-debug");
+        std::string sub = cmdline_str.substr(i + std::char_traits<char>::length(ip_cmd));
+        if (!sub.empty())
+        {
+            ip = sub.substr(0, sub.find(' '));
+            if (!ip.empty())
+            {
+                std::regex r("^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])$");
+                if (std::regex_match(ip, r))
+                {
+                    tmfwsi::server_ip = ip;
+                }
+                else
+                {
+                    invalid_ip = true;
+                }
+            }
+            else
+            {
+                invalid_ip = true;
+            }
+        }
+        else
+        {
+            invalid_ip = true;
+        }
     }
 
-    MAIN_PROC(tmfwsi::main::init_console());
-    MAIN_PROC(tmfwsi::main::init_mutex());
-    MAIN_PROC(tmfwsi::main::init_resource());
-    MAIN_PROC(tmfwsi::main::init_curl());
+    if (strstr(cmdline, "-do-hosts"))
+    {
+        return tmfwsi::main_do_hosts();
+    }
+
+    using namespace tmfwsi::main;
+
+    // Only if we're not in debug mode already (at compile time)
+    if (!debug)
+    {
+        debug = strstr(cmdline, "-debug");
+    }
+
+    if (strstr(cmdline, "-logging"))
+    {
+        if (strstr(cmdline, "-logging verbose"))
+        {
+            logging = log_mode::verbose;
+        }
+        else
+        {
+            logging = log_mode::on;
+        }
+    }
+
+    MAIN_PROC(init_console_and_logging());
+
+    if (invalid_ip)
+    {
+        log(log_level::error, std::format("The IP you've entered, '{}', is invalid.", ip));
+        return cleanup(1);
+    }
+
+    MAIN_PROC(init_mutex());
+    MAIN_PROC(init_resource());
+    MAIN_PROC(init_curl());
 
     if (!strstr(cmdline, "-no-update"))
     {
-        MAIN_PROC(tmfwsi::main::update_check());
+        MAIN_PROC(update_check());
     }
     else
     {
-        tmfwsi::log(tmfwsi::log_level::warn, "Skipping update check due to launch parameter - please check for important TMFWSI updates manually on GitHub.");
+        log(log_level::warn, "Skipping update check due to launch parameter - please check for important TMFWSI updates manually on GitHub.");
     }
 
-    MAIN_PROC(tmfwsi::main::get_tmfws_ip());
-    MAIN_PROC(tmfwsi::main::generate_ssl_certificate());
+    MAIN_PROC(get_tmfws_ip());
+    MAIN_PROC(generate_ssl_certificate());
 
     bool hosts_enabled = !strstr(cmdline, "-no-hosts");
     if (hosts_enabled)
     {
-        MAIN_PROC(tmfwsi::main::do_hosts());
+        MAIN_PROC(do_hosts());
     }
     else
     {
-        tmfwsi::log(tmfwsi::log_level::warn, "Skipping hosts file modification due to launch parameter.");
+        log(log_level::warn, "Skipping hosts file modification due to launch parameter.");
     }
 
-    MAIN_PROC(tmfwsi::main::ssl_server::loop());
+    MAIN_PROC(ssl_server::loop());
 
     if (hosts_enabled)
     {
-        MAIN_PROC(tmfwsi::main::undo_hosts());
+        MAIN_PROC(undo_hosts());
     }
 
-    return tmfwsi::main::cleanup(0);
+    return cleanup(0);
 }

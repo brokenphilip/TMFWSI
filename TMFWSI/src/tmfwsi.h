@@ -1,8 +1,6 @@
 #pragma once
 
-#include <iostream>
 #include <filesystem>
-#include <fstream>
 #include <regex>
 
 #define CURL_STATICLIB
@@ -18,41 +16,15 @@
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MAKE SURE TO UPDATE THE VERSION RESOURCE AS WELL !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #define TMFWSI_VERSION "1.0"
 
-// 127 :3c
-#define DEFAULT_ADDRESS "127.58.51.99"
-
 #define HOSTS_PATH	"C:\\Windows\\system32\\drivers\\etc\\"
 #define HOSTS		HOSTS_PATH "hosts"
 
+namespace fs = std::filesystem;
+
 namespace tmfwsi
 {
-	inline HANDLE mutex = nullptr;
-
-	inline char ip[16] = { 0 };
-
-	inline std::string xml = "";
-
-	inline CURL* curl = nullptr;
-	inline EVP_PKEY* pkey = nullptr;
-	inline X509* x509 = nullptr;
-	
-	inline httplib::SSLServer* server = nullptr;
-	inline bool server_stopped = false;
-
-	// TODO: maybe this should be a launch option?
-#if defined(_DEBUG)
-	inline bool debug = true;
-#else
-	inline bool debug = false;
-#endif
-
-	enum class log_level
-	{
-		info,
-		warn,
-		error,
-		debug
-	};
+	// 127 WSI
+	inline std::string server_ip = "127.87.83.73";
 
 	namespace error
 	{
@@ -69,11 +41,9 @@ namespace tmfwsi
 			const char* message();
 		};
 
-		void curl(log_level ll, CURLcode c);
-		void openssl(log_level ll);
-		void windows(log_level ll, DWORD gle);
-
 		constexpr int customer = 1 << 29;
+
+		using error_t = DWORD;
 
 		/* TMFWSI Error Causes (0 - 15) */
 		enum cause : int
@@ -83,7 +53,8 @@ namespace tmfwsi
 			get_exit_code_process,
 			delete_file,
 			copy_file,
-			std_ofstream,
+			create_file,
+			write_file,
 
 			_last = 15,
 			_bits = 24,
@@ -92,18 +63,39 @@ namespace tmfwsi
 		};
 
 		// Windows to TMFWSI
-		DWORD make(DWORD e, cause f);
+		error_t make(DWORD e, cause f);
 
 		// TMFWSI to Windows
-		DWORD parse(DWORD e_tmfwsi);
+		DWORD parse(error_t e_tmfwsi);
 
-		const char* cause_name(int e_tmfwsi);
+		const char* cause_name(error_t e_tmfwsi);
 	}
 
-	// Starts a new hidden TMFWSI instance as admin with the specified arguments
-	DWORD run(LPCSTR args);
+	namespace file
+	{
+		inline fs::path exe_path = []()
+		{
+			char path[MAX_PATH] = { 0 };
+			GetModuleFileNameA(NULL, path, MAX_PATH);
+			return fs::path(path).parent_path();
+		}();
 
-	void log(log_level ll, std::string str);
+		class writer
+		{
+			HANDLE handle = INVALID_HANDLE_VALUE;
+			DWORD create_file_gle = 0;
+		public:
+			writer(const char* file);
+			writer(fs::path path) : writer(path.string().c_str()) {}
+			~writer();
+
+			tmfwsi::error::error_t write(const char* str, DWORD len);
+			tmfwsi::error::error_t write(std::string const& str);
+		};
+
+		DWORD check_permissions(const char* file);
+		DWORD check_permissions(fs::path path);
+	}
 
 	int main_do_hosts();
 	int main_undo_hosts();
@@ -119,8 +111,52 @@ namespace tmfwsi
 
 	namespace main
 	{
+#if defined(_DEBUG)
+		inline bool debug = true;
+#else
+		inline bool debug = false;
+#endif
+
+		enum class log_mode
+		{
+			off,
+			on,
+			verbose
+		};
+		inline log_mode logging = log_mode::off;
+
+		inline HANDLE mutex = nullptr;
+
+		inline char tmfws_ip[16] = { 0 };
+
+		inline std::string xml = "";
+
+		inline CURL* curl = nullptr;
+		inline EVP_PKEY* pkey = nullptr;
+		inline X509* x509 = nullptr;
+
+		inline file::writer* logger = nullptr;
+
+		// Starts a new hidden TMFWSI instance as admin with the specified arguments
+		tmfwsi::error::error_t run(const char* args);
+		tmfwsi::error::error_t run(std::string const& args);
+
+		enum class log_level
+		{
+			info,
+			warn,
+			error,
+			debug
+		};
+
+		void log(log_level ll, std::string const& str);
+
+		void curl_log(log_level ll, CURLcode c);
+		void openssl_log(log_level ll);
+		void windows_log(log_level ll, DWORD gle);
+
+		int init_console_and_logging();
 		int init_mutex();
-		int init_console();
 		int init_resource();
 		int init_curl();
 		int update_check();
@@ -132,6 +168,9 @@ namespace tmfwsi
 
 		namespace ssl_server
 		{
+			inline httplib::SSLServer* server = nullptr;
+			inline bool stopped = false;
+
 			int loop();
 
 			void get(const httplib::Request& request, httplib::Response& response);
