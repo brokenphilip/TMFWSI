@@ -127,7 +127,7 @@ namespace tmfwsi
 
 		inline HANDLE mutex = nullptr;
 
-		inline char tmfws_ip[16] = { 0 };
+		inline std::string tmfws_ip = "";
 
 		inline std::string xml = "";
 

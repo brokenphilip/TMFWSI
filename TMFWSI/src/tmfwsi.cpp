@@ -304,6 +304,7 @@ tmfwsi::error::error_t tmfwsi::main::run(std::string const& args)
 
 void tmfwsi::main::log(log_level ll, std::string const& str)
 {
+    // Since cURL's VERBOSE/DEBUGFUNCTION options are multi-threaded, we must use a mutex here
     static std::mutex mtx;
     std::lock_guard lg(mtx);
 
@@ -618,7 +619,8 @@ int tmfwsi::main::get_tmfws_ip()
     }
 
     log(log_level::info, std::format("TrackMania Forever Web Services IP address: {}", primary_ip));
-    strcpy_s(tmfws_ip, primary_ip);
+    tmfws_ip = primary_ip;
+
     curl_easy_reset(curl);
     return 0;
 }
@@ -770,6 +772,10 @@ int tmfwsi::main::ssl_server::loop()
 
 void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Response& response)
 {
+    // Since httplib is multi-threaded, and we shouldn't use more than one cURL instance (not to break cookie/manialink support), we must use a mutex here
+    static std::mutex mtx;
+    std::lock_guard lg(mtx);
+
     log(log_level::info, "Request received, performing...");
 
     // First, let's build our URL, making sure to include the query string
@@ -790,7 +796,7 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
         curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, curl_debug);
     }
 
-    std::string url = "https://" + server_ip + request.path + params;
+    std::string url = "https://" + tmfws_ip + request.path + params;
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 
     // Enable cookie engine - helps with Manialinks
