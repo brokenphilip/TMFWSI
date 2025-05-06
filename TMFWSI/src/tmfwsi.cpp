@@ -64,6 +64,7 @@ const char* tmfwsi::error::cause_name(error_t e_tmfwsi)
         case copy_file:                 return "CopyFile";
         case create_file:               return "CreateFile";
         case write_file:                return "WriteFile";
+        case get_file_attributes:       return "GetFileAttributes";
         default:                        return unknown_cause;
     }
 }
@@ -141,9 +142,38 @@ DWORD tmfwsi::file::check_permissions(const char* file)
     return 0;
 }
 
-DWORD tmfwsi::file::check_permissions(fs::path path)
+DWORD tmfwsi::file::check_permissions(fs::path const& path)
 {
     return check_permissions(path.string().c_str());
+}
+
+DWORD tmfwsi::file::erase(const char* file, bool must_exist)
+{
+    auto e_perms = check_permissions(file);
+    if (e_perms)
+    {
+        if (e_perms != ERROR_FILE_NOT_FOUND || must_exist)
+        {
+            return e_perms;
+        }
+    }
+
+    if (!DeleteFileA(file))
+    {
+        auto gle = GetLastError();
+
+        if (gle != ERROR_FILE_NOT_FOUND || must_exist)
+        {
+            return gle;
+        }
+    }
+
+    return 0;
+}
+
+DWORD tmfwsi::file::erase(fs::path const& path, bool must_exist)
+{
+    return erase(path.string().c_str(), must_exist);
 }
 
 int tmfwsi::main_do_hosts()
@@ -151,30 +181,27 @@ int tmfwsi::main_do_hosts()
     auto bak_str = (file::exe_path / "hosts.tmfwsi_bak").string();
     auto bak = bak_str.c_str();
 
-    auto attribs = file::check_permissions(bak);
-    if (attribs)
+    // First and foremost, check the hosts file's permissions - there's no point in doing anything past this point if it can't even be modified
+    auto result = file::check_permissions(HOSTS);
+    if (result)
     {
-        return error::make(attribs, error::cause::delete_file);
+        return error::make(result, error::cause::get_file_attributes);
     }
 
-    // Delete the old backup file, if any
-    if (!DeleteFileA(bak))
+    // Next, since we know the hosts file is probably okay, it's time to erase the backup
+    result = file::erase(bak);
+    if (result)
     {
-        auto gle = GetLastError();
-
-        // If the file wasn't found, we don't care. If deletion failed for any other reason though, bail
-        if (gle != ERROR_FILE_NOT_FOUND)
-        {
-            return error::make(gle, error::cause::delete_file);
-        }
+        return error::make(result, error::cause::delete_file);
     }
 
-    // Make a backup of the hosts file
-    if (!CopyFileA(HOSTS, bak, true))
+    // Make a backup of the hosts file. We could be more strict and pass 'true' to bFailIfExists, but the backup file shouldn't exist anymore anyways
+    if (!CopyFileA(HOSTS, bak, false))
     {
         return error::make(GetLastError(), error::cause::copy_file);
     }
 
+    // Finally, now that we have a backup, modify the hosts file
     {
         file::writer fw(HOSTS);
 
@@ -193,13 +220,14 @@ int tmfwsi::main_undo_hosts()
     auto bak_str = (file::exe_path / "hosts.tmfwsi_bak").string();
     auto bak = bak_str.c_str();
 
-    auto attribs = file::check_permissions(bak);
-    if (attribs)
+    // First, check the hosts file's permissions
+    auto result = file::check_permissions(HOSTS);
+    if (result)
     {
-        return error::make(attribs, error::cause::copy_file);
+        return error::make(result, error::cause::get_file_attributes);
     }
 
-    // Replace the 'hosts' file with our backup.
+    // Then, replace the 'hosts' file with our backup
     if (!CopyFileA(bak, HOSTS, false))
     {
         return error::make(GetLastError(), error::cause::copy_file);

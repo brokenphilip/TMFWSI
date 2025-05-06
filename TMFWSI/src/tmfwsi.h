@@ -55,6 +55,7 @@ namespace tmfwsi
 			copy_file,
 			create_file,
 			write_file,
+			get_file_attributes,
 
 			_last = 15,
 			_bits = 24,
@@ -86,7 +87,7 @@ namespace tmfwsi
 			DWORD create_file_gle = 0;
 		public:
 			writer(const char* file);
-			writer(fs::path path) : writer(path.string().c_str()) {}
+			writer(fs::path const& path) : writer(path.string().c_str()) {}
 			~writer();
 
 			tmfwsi::error::error_t write(const char* str, DWORD len);
@@ -94,7 +95,10 @@ namespace tmfwsi
 		};
 
 		DWORD check_permissions(const char* file);
-		DWORD check_permissions(fs::path path);
+		DWORD check_permissions(fs::path const& path);
+
+		DWORD erase(const char* file, bool must_exist = false);
+		DWORD erase(fs::path const& path, bool must_exist = false);
 	}
 
 	int main_do_hosts();
