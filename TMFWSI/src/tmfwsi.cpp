@@ -426,6 +426,40 @@ int tmfwsi::main::curl_debug(CURL* handle, curl_infotype it, char* data, size_t 
     return 0;
 }
 
+void tmfwsi::main::curl_cookies_debug()
+{
+    if (!debug && logging != log_mode::verbose)
+    {
+        return;
+    }
+
+    curl_slist* cookies = nullptr;
+    auto res = curl_easy_getinfo(curl, CURLINFO_COOKIELIST, &cookies);
+    if (res)
+    {
+        log(log_level::debug, "Failed to get cookies:");
+        curl_log(log_level::debug, res);
+        return;
+    }
+
+    if (!cookies)
+    {
+        log(log_level::debug, "No cookies set.");
+        return;
+    }
+
+    log(log_level::debug, "=== Cookies START ===");
+    curl_slist* each = cookies;
+    while (each)
+    {
+        log(log_level::debug, each->data);
+        each = each->next;
+    }
+    log(log_level::debug, "=== Cookies END ===");
+
+    curl_slist_free_all(cookies);
+}
+
 int tmfwsi::main::init_console_and_logging()
 {
     SetConsoleTitleA(TMFWSI " " TMFWSI_VERSION);
@@ -731,9 +765,17 @@ BOOL WINAPI tmfwsi::main::control_handler(DWORD ctrl)
 {
     if (!ssl_server::stopped && (ctrl == CTRL_C_EVENT || ctrl == CTRL_CLOSE_EVENT))
     {
-        ssl_server::stopped = true;
         log(log_level::warn, "Close or CTRL+C event received - stopping server...");
-        ssl_server::server->stop();
+
+        ssl_server::stopped = true;
+        if (ssl_server::server)
+        {
+            ssl_server::server->stop();
+        }
+        else
+        {
+            log(log_level::error, "Tried to stop a server that doesn't exist.");
+        }
         return TRUE;
     }
     return FALSE;
@@ -866,9 +908,16 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
     response.body = data;
 
     log(log_level::debug, std::format("Response code: {}", response.status));
-    log(log_level::debug, "=== Sent data START ===");
-    log(log_level::debug, data);
-    log(log_level::debug, "=== Sent data END ===");
+    if (data.empty())
+    {
+        log(log_level::debug, "Sent data is empty.");
+    }
+    else
+    {
+        log(log_level::debug, "=== Sent data START ===");
+        log(log_level::debug, data);
+        log(log_level::debug, "=== Sent data END ===");
+    }
     log(log_level::debug, "=== Sent header START ===");
 
     // Set the headers
@@ -876,6 +925,8 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
     curl_header* header = nullptr;
     while ((header = curl_easy_nextheader(curl, CURLH_HEADER, 0, prev)))
     {
+        log(log_level::debug, std::format("{}:{}", header->name, header->value));
+
         // HACK: If the TMFWS wants to redirect us to the Player Page in the Manialink browser, we need to tell the user to log in through their web browser first
         // TODO: Find out why this is broken, I assume this is on TMFWSI's end but there is a possibility this could be on Nadeo's end as well, no idea
         constexpr auto player_page = "https://players.trackmaniaforever.com/";
@@ -883,6 +934,9 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
 
         if (!strcmp(header->name, "Location") && !strncmp(header->value, player_page, player_page_len) && request.get_header_value("User-Agent") == "GameBox")
         {
+            log(log_level::debug, "[Headers SKIPPED, due to GameBox User-Agent - sending ManiaLink instead...]");
+            log(log_level::debug, "=== Sent header END ===");
+
             response.headers.clear();
             response.status = 200; // OK
 
@@ -893,22 +947,20 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
             response.body = std::regex_replace(response.body, std::regex("%URL2%"), header->value);
             response.body = std::regex_replace(response.body, std::regex("&"), "&amp;");
 
-            log(log_level::debug, std::format("{}:{}", header->name, header->value));
-            log(log_level::debug, "[Headers SKIPPED, due to GameBox User-Agent - sending ManiaLink instead...]");
-            log(log_level::debug, "=== Sent header END ===");
+            curl_cookies_debug();
 
             log(log_level::info, "Request performed successfully.");
             curl_easy_reset(curl);
             return;
         }
 
-        log(log_level::debug, std::format("{}:{}", header->name, header->value));
-
         response.set_header(header->name, header->value);
         prev = header;
     }
 
     log(log_level::debug, "=== Sent header END ===");
+
+    curl_cookies_debug();
 
     log(log_level::info, "Request performed successfully.");
     curl_easy_reset(curl);
