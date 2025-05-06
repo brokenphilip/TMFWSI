@@ -928,7 +928,6 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
         log(log_level::debug, std::format("{}:{}", header->name, header->value));
 
         // HACK: If the TMFWS wants to redirect us to the Player Page in the Manialink browser, we need to tell the user to log in through their web browser first
-        // TODO: Find out why this is broken, I assume this is on TMFWSI's end but there is a possibility this could be on Nadeo's end as well, no idea
         constexpr auto player_page = "https://players.trackmaniaforever.com/";
         constexpr auto player_page_len = std::char_traits<char>::length(player_page);
 
