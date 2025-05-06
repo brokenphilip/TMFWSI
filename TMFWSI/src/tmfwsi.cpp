@@ -57,14 +57,14 @@ const char* tmfwsi::error::cause_name(error_t e_tmfwsi)
 
     switch ((cause)f)
     {
-        case shell_execute_ex: return "ShellExecuteEx";
-        case wait_for_single_object: return "WaitForSingleObject";
-        case get_exit_code_process: return "GetExitCodeProcess";
-        case delete_file: return "DeleteFile";
-        case copy_file: return "CopyFile";
-        case create_file: return "CreateFile";
-        case write_file: return "WriteFile";
-        default: return unknown_cause;
+        case shell_execute_ex:          return "ShellExecuteEx";
+        case wait_for_single_object:    return "WaitForSingleObject";
+        case get_exit_code_process:     return "GetExitCodeProcess";
+        case delete_file:               return "DeleteFile";
+        case copy_file:                 return "CopyFile";
+        case create_file:               return "CreateFile";
+        case write_file:                return "WriteFile";
+        default:                        return unknown_cause;
     }
 }
 
@@ -320,10 +320,10 @@ void tmfwsi::main::log(log_level ll, std::string const& str)
     std::string prefix;
     switch (ll)
     {
-        case log_level::warn: prefix = " WARN"; break;
-        case log_level::error: prefix = "ERROR"; break;
-        case log_level::debug: prefix = "DEBUG"; break;
-        default: prefix = " INFO"; break;
+        case log_level::warn:   prefix = " WARN"; break;
+        case log_level::error:  prefix = "ERROR"; break;
+        case log_level::debug:  prefix = "DEBUG"; break;
+        default:                prefix = " INFO"; break;
     }
 
     // If logging is enabled, and either (1) it's not a debug log, or (2) it is a debug log, but we are also verbose logging as well
@@ -333,15 +333,15 @@ void tmfwsi::main::log(log_level ll, std::string const& str)
         {
             switch (month)
             {
-                case 1: return "Jan";
-                case 2: return "Feb";
-                case 3: return "Mar";
-                case 4: return "Apr";
-                case 5: return "May";
-                case 6: return "Jun";
-                case 7: return "Jul";
-                case 8: return "Aug";
-                case 9: return "Sep";
+                case  1: return "Jan";
+                case  2: return "Feb";
+                case  3: return "Mar";
+                case  4: return "Apr";
+                case  5: return "May";
+                case  6: return "Jun";
+                case  7: return "Jul";
+                case  8: return "Aug";
+                case  9: return "Sep";
                 case 10: return "Oct";
                 case 11: return "Nov";
                 case 12: return "Dec";
@@ -361,10 +361,10 @@ void tmfwsi::main::log(log_level ll, std::string const& str)
 
     switch (ll)
     {
-        case log_level::warn: prefix.insert(0, "\x1B[93m"); break;
-        case log_level::error: prefix.insert(0, "\x1B[91m"); break;
-        case log_level::debug: prefix.insert(0, "\x1B[95m"); break;
-        default: prefix.insert(0, "\x1B[97m"); break;
+        case log_level::warn:   prefix.insert(0, "\x1B[93m"); break;
+        case log_level::error:  prefix.insert(0, "\x1B[91m"); break;
+        case log_level::debug:  prefix.insert(0, "\x1B[95m"); break;
+        default:                prefix.insert(0, "\x1B[97m"); break;
     }
 
     prefix += "\x1B[0m";
@@ -402,15 +402,15 @@ int tmfwsi::main::curl_debug(CURL* handle, curl_infotype it, char* data, size_t 
 
     switch (it)
     {
-        case CURLINFO_TEXT: prefix = " T  E  X  T "; break;
-        case CURLINFO_HEADER_IN: prefix = "  HEADER_IN "; break;
-        case CURLINFO_HEADER_OUT: prefix = " HEADER_OUT "; break;
-        case CURLINFO_DATA_IN: prefix = "   DATA_IN  "; break;
-        case CURLINFO_DATA_OUT: prefix = "  DATA_OUT  "; break;
-        case CURLINFO_SSL_DATA_IN: prefix = " SSL_DATA_IN"; break;
+        case CURLINFO_TEXT:         prefix = " T  E  X  T "; break;
+        case CURLINFO_HEADER_IN:    prefix = "  HEADER_IN "; break;
+        case CURLINFO_HEADER_OUT:   prefix = " HEADER_OUT "; break;
+        case CURLINFO_DATA_IN:      prefix = "   DATA_IN  "; break;
+        case CURLINFO_DATA_OUT:     prefix = "  DATA_OUT  "; break;
+        case CURLINFO_SSL_DATA_IN:  prefix = " SSL_DATA_IN"; break;
         case CURLINFO_SSL_DATA_OUT: prefix = "SSL_DATA_OUT"; break;
-        case CURLINFO_END: prefix = "  E   N   D "; break;
-        default: prefix = "            "; break;
+        case CURLINFO_END:          prefix = "  E   N   D "; break;
+        default:                    prefix = "            "; break;
     }
 
     // Size minus one to remove the trailing newline
@@ -736,7 +736,6 @@ BOOL WINAPI tmfwsi::main::control_handler(DWORD ctrl)
         ssl_server::server->stop();
         return TRUE;
     }
-
     return FALSE;
 }
 
