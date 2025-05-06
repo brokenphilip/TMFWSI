@@ -874,9 +874,7 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
         constexpr auto player_page = "https://players.trackmaniaforever.com/";
         constexpr auto player_page_len = std::char_traits<char>::length(player_page);
 
-        bool is_user_agent_gamebox = request.has_header("User-Agent") && request.get_header_value("User-Agent") == "GameBox";
-
-        if (!strcmp(header->name, "Location") && !strncmp(header->value, player_page, player_page_len) && is_user_agent_gamebox)
+        if (!strcmp(header->name, "Location") && !strncmp(header->value, player_page, player_page_len) && request.get_header_value("User-Agent") == "GameBox")
         {
             response.headers.clear();
             response.status = 200; // OK

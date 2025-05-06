@@ -14,6 +14,6 @@
          
          2. Click $f80$l[%URL1%]here$l$fff to open the Player Page in your web browser - after logging in, copy the resulting URL and paste it in-game as if it were a regular Manialink.
          
-         Alternatively, if you believe this was a mistake, you can try opening the Player Page link directly as a Manialink instead.' autonewline='1'/>
+         3.  Alternatively, if you believe this was a mistake, you can try opening the Player Page link directly as a Manialink instead:' autonewline='1'/>
   <label posn='0 -20 5' sizen='26 4' halign='center' style='CardButtonMedium' manialink='%URL2%' text='Open as Manialink'/>
 </manialink>
