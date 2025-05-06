@@ -807,7 +807,7 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
 
     // Next, fetch the request headers
     // User-Agent in particular is very important - for reference, TMF uses "GameBox" and MP uses "ManiaPlanet" for their in-game Manialink browsers
-    // Authorization is also important, in case the Web Services API is used
+    // Authorization is also important, in case the Web Services API is used (although, for some reason, it's broken (at curl/low-level?) and can't be fixed)
     curl_slist* slist = nullptr;
     for (auto& it : request.headers)
     {
