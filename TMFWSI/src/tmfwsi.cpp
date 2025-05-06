@@ -413,8 +413,16 @@ int tmfwsi::main::curl_debug(CURL* handle, curl_infotype it, char* data, size_t 
         default: prefix = "            "; break;
     }
 
-    std::string err(data, size);
-    log(log_level::debug, std::format("(cURL debug {}) {}", prefix, err));
+    // Size minus one to remove the trailing newline
+    std::string err(data, size - 1);
+    std::stringstream ss(err);
+    std::string line;
+
+    while (std::getline(ss, line))
+    {
+        // We could add a "if (!line.empty())" check here, but i think it's better to print out empty newlines for formatting sake
+        log(log_level::debug, std::format("(cURL {}) {}", prefix, line));
+    }
     return 0;
 }
 
