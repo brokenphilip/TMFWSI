@@ -402,15 +402,15 @@ int tmfwsi::main::curl_debug(CURL* handle, curl_infotype it, char* data, size_t 
 
     switch (it)
     {
-        case CURLINFO_TEXT: prefix = " T  E  X  T ";
-        case CURLINFO_HEADER_IN: prefix = "  HEADER_IN ";
-        case CURLINFO_HEADER_OUT: prefix = " HEADER_OUT ";
-        case CURLINFO_DATA_IN: prefix = "   DATA_IN  ";
-        case CURLINFO_DATA_OUT: prefix = "  DATA_OUT  ";
-        case CURLINFO_SSL_DATA_IN: prefix = " SSL_DATA_IN";
-        case CURLINFO_SSL_DATA_OUT: prefix = "SSL_DATA_OUT";
-        case CURLINFO_END: prefix = "  E   N   D ";
-        default: prefix = "            ";
+        case CURLINFO_TEXT: prefix = " T  E  X  T "; break;
+        case CURLINFO_HEADER_IN: prefix = "  HEADER_IN "; break;
+        case CURLINFO_HEADER_OUT: prefix = " HEADER_OUT "; break;
+        case CURLINFO_DATA_IN: prefix = "   DATA_IN  "; break;
+        case CURLINFO_DATA_OUT: prefix = "  DATA_OUT  "; break;
+        case CURLINFO_SSL_DATA_IN: prefix = " SSL_DATA_IN"; break;
+        case CURLINFO_SSL_DATA_OUT: prefix = "SSL_DATA_OUT"; break;
+        case CURLINFO_END: prefix = "  E   N   D "; break;
+        default: prefix = "            "; break;
     }
 
     std::string err(data, size);
