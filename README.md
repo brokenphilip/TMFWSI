@@ -1,39 +1,77 @@
 # TrackMania Forever Web Services Interceptor
-> [!NOTE]
-> This repository is currently an **early work-in-progress**, any and all information is subject to change without notice and may be missing or incorrect.
-
 TMFWSI intercepts traffic to TrackMania Forever Web Services (`ws.trackmania.com`) on your local machine, "fixing" bugs such as:
 - "`http error 12170`", from the in-game Manialink browser
 - "`ERR_SSL_VERSION_OR_CIPHER_MISMATCH`", from a Chromium browser
-- "`ERROR_INTERNET_SEC_CERT_REVOKED` or `CRYPT_E_REVOKED` - The SSL certificate was revoked"
+- `ERROR_INTERNET_SEC_CERT_REVOKED` or `CRYPT_E_REVOKED` - "The SSL certificate was revoked"
 
 By doing so, this allows you to log-in to the following services:
 - [home.trackmania.com](http://home.trackmania.com/) web page, to check your linked forums & authorized applications
 - [developers.trackmania.com](http://developers.trackmania.com/) web page, to access the Web Services API
-- [maniapub](http://maniapub.trackmania.com/) Manialink, to manage your in-game advertisements
+- [maniapub](http://maniapub.trackmania.com/) Manialink, to manage your in-game Manialink advertisements
 - [freezone:servers](http://dedicp.maniastudio.com/) Manialink, to manage your FreeZone servers
-- any other website or Manialink not listed here that uses `ws.trackmania.com` for authentication
-
-Technically speaking, this is accomplished by locally hosting a middleman SSL server using [httplib](https://github.com/yhirose/cpp-httplib) and [OpenSSL](https://github.com/openssl/openssl), modifying your computer's `hosts` file to point to it, and using [cURL](https://github.com/curl/curl) (alongside [zlib](https://github.com/madler/zlib)) with the necessary parameters to establish a connection to the TMF Web Services by skipping certificate revocation checks - as this is all done locally on your machine, no data gets sent anywhere else other than the TMF Web Services.
-
-> [!WARNING]
-> **Do not connect to anyone else's TMFWSI instance**, by editing the `hosts` file manually or otherwise. You should only self-host TMFWSI locally on your machine, and the project is designed in such a way to make this process as easy as possible.
+- any other website or Manialink not listed here which uses `ws.trackmania.com` for authentication
 
 > [!CAUTION]
-> While this program is safer than the popular `inetcpl.cpl` alternate method (explained below), it is important to note that this is still a **very unsafe** way of communicating sensitive (login) data to a server and should merely be used as a temporary workaround for those that require the above listed services, hence why the word "fixing" was put in quotes in the first paragraph - a proper fix would be for the maintainers of the TMF Web Services to renew its certificates and employ better security practices overall.
+> **Do not, under any circumstances, connect to anyone else's TMFWSI instance**, by editing the `hosts` file manually or otherwise. You should only self-host TMFWSI locally on your machine, and the project is designed in such a way to make this process as easy as possible.
+
+> [!WARNING]
+> Generally speaking, this is a **very unsafe** way of communicating sensitive (login) data to a server and should merely be used as a temporary workaround for those that require the above listed services, hence why the word "fixing" was put in quotes in the first paragraph - a proper fix would be for the maintainers of the TMF Web Services to renew its certificates and employ better security practices overall.
 
 ## Usage
 1. Head over to [Releases](https://github.com/brokenphilip/TMFWSI/releases) and download the latest `TMFWSI.zip`
 2. Extract the the contents of the zip archive wherever you'd like
-3. When you need to access `ws.trackmania.com` or anything which uses it (for example, the services listed above), simply run the program
+   - To avoid file permission issues, do **not** extract TMFWSI in the following locations:
+      - "Program Files", as well as "Program Files (x86)", or any of their subdirectories
+      - The root of your operating system drive, usually `C:\`
+      - Your user profile (`%USERPROFILE%`), the Documents folder (`%USERPROFILE%\Documents`) or your Desktop (`%USERPROFILE%\Desktop`)
+4. When you need to access `ws.trackmania.com` or anything which uses it (ie. the services listed above), simply run the program
    - TrackMania Nations/United Forever, as well as some web browsers, will need to be restarted first
-4. Whenever you're done, break out of (`Ctrl+C`) or shut down the program
+5. Whenever you're done, break out of the program using <kbd>Ctrl</kbd> + <kbd>C</kbd> or simply close it
 
-## Troubleshooting
-If you encounter any issues during installation or usage, please refer to the [issue tracker](https://github.com/brokenphilip/TMFWSI/issues?q=). If you haven't found your issue, feel free to create a new one. If you have any further questions about the project, or if (understandably) using the issue tracker is too confusing, feel free to add me on Discord (`brokenphilip`) and I will try to get back to you as soon as possible. :)
+### Launch parameters
+- `-debug` - Launches TMFWSI in debug mode - currently, this only shows `DEBUG` prints in the console
+- `-ip x.x.x.x` - Starts the SSL server with a custom IP address `x.x.x.x` instead of the default `127.87.83.73`
+- `-logging` - Saves all console prints (except for `DEBUG`) to `tmfwsi.log` in the same location as the program
+- `-logging verbose` - Saves all console prints (including `DEBUG`) to `tmfwsi.log` in the same location as the program
+- `-no-hosts` - Won't automatically update the `hosts` file, but it will need to be done manually, see [below](https://github.com/brokenphilip/TMFWSI#modifying-the-hosts-file-manually)
+- `-no-update` - Won't check GitHub for program updates, **not recommended**
 
-### Common issues
-*[todo]*
+## Troubleshooting and common problems
+If you encounter any issues during installation or usage that hasn't been mentioned below, please refer to the [issue tracker](https://github.com/brokenphilip/TMFWSI/issues?q=). If you haven't found your issue, feel free to create a new one. If you have any further questions about the project, or if (understandably) using the issue tracker is too confusing, feel free to add me on Discord (`brokenphilip`) and I will try to get back to you as soon as possible. :)
+
+### `Couldn't connect to server (CURLcode: 7)`
+No internet connection, or, in the case of fetching the IP address of the TrackMania Forever Web Services, usually means there already is an entry for it in the `hosts` file, created by TMFWSI or someone/something else. TMFWSI should almost always remove the `hosts` file entry automatically upon shutdown, but in the case it does not, a backup file named can be found in the same folder as the program. For more information, see [below](https://github.com/brokenphilip/TMFWSI#modifying-the-hosts-file-manually).
+
+### `An operation is not supported on a directory.  (Code: 336)`
+Upon trying to access the file in question, it came across a folder with the same name. Files and folders cannot have identical names within the same directory. Delete the folder and try again.
+
+### `The specified file is read only.  (Code: 6009)`
+Upon trying to access the file in question, it was flagged as read-only. Remove the read-only flag from the file and try again.
+
+### `The operation was canceled by the user.  (Code: 1223)`
+In the case of `hosts` file modification, specifically `ShellExecuteEx`, User Account Control prompted you to run TMFWSI as an administrator and it was declined. TMFWSI itself does not require administrator access, it is only used when creating a new sub-process for modifying the `hosts` file, which is a necessary step for the program to work. Either give TMFWSI permission to run as admin, or disable `hosts` file editing by starting TMFWSI with the `-no-hosts` launch parameter (but you will have to modify the `hosts` file yourself, see [below](https://github.com/brokenphilip/TMFWSI#modifying-the-hosts-file-manually)).
+
+### `http error 12170`
+Either TMFWSI is not running, or it is running, but you have not restarted your game yet. Shut down TrackMania (Nations/United) Forever, launch TMFWSI and try again.
+
+It is also possible that the `hosts` file has not been modified, either due to an error, or it's been disabled using the `-no-hosts` launch parameter. The hosts file must be modified for TMFWSI to work, either automatically by the program itself or manually by the user (for more information, see [below](https://github.com/brokenphilip/TMFWSI#modifying-the-hosts-file-manually)).
+
+## Modifying the `hosts` file manually
+The plain-text `hosts` file can be found in `%WINDIR%\System32\drivers\etc` and can be modified using a text editor such as `Notepad`. It is recommended you create a backup of the `hosts` file and keep it somewhere safe, in case you need to recover it.
+
+### On startup
+When you're running TMFWSI with the `-no-hosts` launch parameter, you will need to add the following entry to the bottom of the `hosts` file:
+```
+// TrackMania Forever Web Services Interceptor
+x.x.x.x	ws.trackmania.com
+```
+...where `x.x.x.x` is the IP of TMFWSI's SSL server (**not** the TrackMania Forever Web Services IP), found in the console output line "`SSL server started - listening to requests on x.x.x.x:443`". By default, this should be `127.87.83.73`, unless specifically changed by the `-ip` launch parameter. The first line is optional, but recommended - as it starts with a `//`, it indicates that the line is a comment, purely for informational purposes.
+
+### On shutdown
+When you're running TMFWSI with the `-no-hosts` launch parameter, you will need to remove the aformentioned line(s) from your `hosts` file. If you're not using the launch parameter and TMFWSI simply failed to revert your `hosts` file, a backup named `hosts.tmfwsi_bak` can be found in the same folder as the program. You can open it with a text editor and compare it with the original `hosts` file, replacing it as necessary.
+
+## Workflow
+To summarize, TMFWSI locally hosts a middleman SSL server using [httplib](https://github.com/yhirose/cpp-httplib) and [OpenSSL](https://github.com/openssl/openssl), modifying your computer's `hosts` file to point to it, and uses [cURL](https://github.com/curl/curl) (alongside [zlib](https://github.com/madler/zlib)) with the necessary parameters (passing all the HTTP(S) data provided by the web browser or game) to establish a connection to the TMF Web Services while skipping certificate revocation checks - as this is all done locally on your machine, no data gets sent anywhere else other than the TMF Web Services.
 
 ## Alternate methods
 In case you wish not to use TMFWSI, or you're running into issues while using it, there are two alternative (but fairly technical) approaches:
