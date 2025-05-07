@@ -829,7 +829,7 @@ int tmfwsi::main::ssl_server::loop()
     }
     server->Get(R"(.*)", get);
 
-    log(log_level::info, std::format("SSL Server started - listening to requests on {}:443...", server_ip));
+    log(log_level::info, std::format("SSL server started - listening to requests on {}:443...", server_ip));
     server->listen_after_bind();
 
     delete server;
