@@ -7,7 +7,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 2018 - 2022, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -24,11 +24,9 @@
  *
  ***************************************************************************/
 
-// brokenphilip/TMFWSI
 #ifdef  __cplusplus
 extern "C" {
 #endif
-// brokenphilip/TMFWSI
 
 struct curl_header {
   char *name;    /* this might not use the same case */
@@ -69,10 +67,8 @@ CURL_EXTERN struct curl_header *curl_easy_nextheader(CURL *easy,
                                                      int request,
                                                      struct curl_header *prev);
 
-// brokenphilip/TMFWSI
-#ifdef  __cplusplus
-}
+#ifdef __cplusplus
+} /* end of extern "C" */
 #endif
-// brokenphilip/TMFWSI
 
 #endif /* CURLINC_HEADER_H */

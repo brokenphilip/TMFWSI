@@ -107,6 +107,7 @@
     <ClInclude Include="ext\curl\system.h" />
     <ClInclude Include="ext\curl\typecheck-gcc.h" />
     <ClInclude Include="ext\curl\urlapi.h" />
+    <ClInclude Include="ext\curl\websockets.h" />
     <ClInclude Include="ext\httplib.h" />
     <ClInclude Include="ext\openssl\aes.h" />
     <ClInclude Include="ext\openssl\asn1.h" />
@@ -122,6 +123,7 @@
     <ClInclude Include="ext\openssl\bnerr.h" />
     <ClInclude Include="ext\openssl\buffer.h" />
     <ClInclude Include="ext\openssl\buffererr.h" />
+    <ClInclude Include="ext\openssl\byteorder.h" />
     <ClInclude Include="ext\openssl\camellia.h" />
     <ClInclude Include="ext\openssl\cast.h" />
     <ClInclude Include="ext\openssl\cmac.h" />
@@ -171,12 +173,15 @@
     <ClInclude Include="ext\openssl\evp.h" />
     <ClInclude Include="ext\openssl\evperr.h" />
     <ClInclude Include="ext\openssl\e_os2.h" />
+    <ClInclude Include="ext\openssl\e_ostime.h" />
     <ClInclude Include="ext\openssl\fipskey.h" />
     <ClInclude Include="ext\openssl\fips_names.h" />
     <ClInclude Include="ext\openssl\hmac.h" />
+    <ClInclude Include="ext\openssl\hpke.h" />
     <ClInclude Include="ext\openssl\http.h" />
     <ClInclude Include="ext\openssl\httperr.h" />
     <ClInclude Include="ext\openssl\idea.h" />
+    <ClInclude Include="ext\openssl\indicator.h" />
     <ClInclude Include="ext\openssl\kdf.h" />
     <ClInclude Include="ext\openssl\kdferr.h" />
     <ClInclude Include="ext\openssl\lhash.h" />
@@ -185,6 +190,7 @@
     <ClInclude Include="ext\openssl\md4.h" />
     <ClInclude Include="ext\openssl\md5.h" />
     <ClInclude Include="ext\openssl\mdc2.h" />
+    <ClInclude Include="ext\openssl\ml_kem.h" />
     <ClInclude Include="ext\openssl\modes.h" />
     <ClInclude Include="ext\openssl\objects.h" />
     <ClInclude Include="ext\openssl\objectserr.h" />
@@ -206,6 +212,7 @@
     <ClInclude Include="ext\openssl\proverr.h" />
     <ClInclude Include="ext\openssl\provider.h" />
     <ClInclude Include="ext\openssl\prov_ssl.h" />
+    <ClInclude Include="ext\openssl\quic.h" />
     <ClInclude Include="ext\openssl\rand.h" />
     <ClInclude Include="ext\openssl\randerr.h" />
     <ClInclude Include="ext\openssl\rc2.h" />
@@ -229,6 +236,7 @@
     <ClInclude Include="ext\openssl\store.h" />
     <ClInclude Include="ext\openssl\storeerr.h" />
     <ClInclude Include="ext\openssl\symhacks.h" />
+    <ClInclude Include="ext\openssl\thread.h" />
     <ClInclude Include="ext\openssl\tls1.h" />
     <ClInclude Include="ext\openssl\trace.h" />
     <ClInclude Include="ext\openssl\ts.h" />
@@ -242,6 +250,7 @@
     <ClInclude Include="ext\openssl\x509err.h" />
     <ClInclude Include="ext\openssl\x509v3.h" />
     <ClInclude Include="ext\openssl\x509v3err.h" />
+    <ClInclude Include="ext\openssl\x509_acert.h" />
     <ClInclude Include="ext\openssl\x509_vfy.h" />
     <ClInclude Include="ext\openssl\__DECC_INCLUDE_EPILOGUE.H" />
     <ClInclude Include="ext\openssl\__DECC_INCLUDE_PROLOGUE.H" />

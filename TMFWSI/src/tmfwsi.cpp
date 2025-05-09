@@ -909,7 +909,7 @@ void tmfwsi::main::ssl_server::get(const httplib::Request& request, httplib::Res
 
     // Do not check for certificates, as they're expired anyways
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-    //curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
     //curl_easy_setopt(curl, CURLOPT_SSL_OPTIONS, CURLSSLOPT_ALLOW_BEAST | CURLSSLOPT_NO_REVOKE);
 
     // Save the result for later
