@@ -34,6 +34,7 @@ By doing so, this allows you to log-in to the following services:
 - `-logging` - Saves all console prints (except for `DEBUG`) to `tmfwsi.log` in the same location as the program
 - `-logging verbose` - Saves all console prints (including `DEBUG`) to `tmfwsi.log` in the same location as the program
 - `-no-hosts` - Won't automatically update the `hosts` file, but it will need to be done manually, see [below](https://github.com/brokenphilip/TMFWSI#modifying-the-hosts-file-manually)
+- `-no-pause` - Won't prompt the user to press <kbd>Enter</kbd> when the program shuts down
 - `-no-update` - Won't check GitHub for program updates, **not recommended**
 
 ## Troubleshooting and common problems

@@ -129,6 +129,8 @@ namespace tmfwsi
 		};
 		inline log_mode logging = log_mode::off;
 
+		inline bool pause = true;
+
 		inline HANDLE mutex = nullptr;
 
 		inline std::string tmfws_ip = "";

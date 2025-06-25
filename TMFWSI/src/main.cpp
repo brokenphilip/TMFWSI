@@ -72,6 +72,8 @@ int main()
         }
     }
 
+    pause = !strstr(cmdline, "-no-pause");
+
     MAIN_PROC(init_console_and_logging());
 
     if (invalid_ip)

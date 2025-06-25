@@ -1013,6 +1013,12 @@ int tmfwsi::main::cleanup(int status)
 {
     log(log_level::info, std::format("TMFWSI is shutting down with code {}... Status: {}", status, (status ? "FAIL" : "OK")));
 
+    if (pause)
+    {
+        log(log_level::info, "Press ENTER to close the program.");
+        std::cin.get();
+    }
+
     if (x509)
     {
         X509_free(x509);
@@ -1039,5 +1045,6 @@ int tmfwsi::main::cleanup(int status)
         CloseHandle(mutex);
         mutex = nullptr;
     }
+
     return status;
 }
