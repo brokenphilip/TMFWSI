@@ -11,11 +11,17 @@ By doing so, this allows you to log-in to the following services:
 - [freezone:servers](http://dedicp.maniastudio.com/) Manialink, to manage your FreeZone servers
 - any other website or Manialink not listed here which uses `ws.trackmania.com` for authentication
 
+> [!NOTE]
+> As of CoreMod 1.07 ([TrackMania ModLoader](https://tomashu.dev/software/tmloader/)), the aformentioned bugs have been fixed - if you only need access to in-game Manialinks, it is recommended to use CoreMod/ModLoader instead of TMFWSI.
+
 > [!CAUTION]
 > **Do not, under any circumstances, connect to anyone else's TMFWSI instance**, by editing the `hosts` file manually or otherwise. You should only self-host TMFWSI locally on your machine, and the project is designed in such a way to make this process as easy as possible.
 
 > [!WARNING]
 > Generally speaking, this is a **very unsafe** way of communicating sensitive (login) data to a server and should merely be used as a temporary workaround for those that require the above listed services, hence why the word "fixing" was put in quotes in the first paragraph - a proper fix would be for the maintainers of the TMF Web Services to renew its certificates and employ better security practices overall.
+
+> [!WARNING]
+> It is not uncommon for `ws.trackmania.com` to give broken responses. This is an issue on Nadeo's end and unfixable/out-of-scope for this project.
 
 ## Usage
 1. Head over to [Releases](https://github.com/brokenphilip/TMFWSI/releases) and download the latest `TMFWSI.zip`
