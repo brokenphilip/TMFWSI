@@ -791,11 +791,11 @@ int tmfwsi::main::do_hosts()
 
 BOOL WINAPI tmfwsi::main::control_handler(DWORD ctrl)
 {
-    if (!ssl_server::stopped && (ctrl == CTRL_C_EVENT || ctrl == CTRL_CLOSE_EVENT))
+    if (!ssl_server::stopped)
     {
+        ssl_server::stopped = true;
         log(log_level::warn, "Close or CTRL+C event received - stopping server...");
 
-        ssl_server::stopped = true;
         if (ssl_server::server)
         {
             ssl_server::server->stop();
@@ -804,6 +804,18 @@ BOOL WINAPI tmfwsi::main::control_handler(DWORD ctrl)
         {
             log(log_level::error, "Tried to stop a server that doesn't exist.");
         }
+
+        // TODO: wtf is this and why did i write it
+        /*
+        if (!strstr(GetCommandLineA(), "-no-hosts"))
+        {
+            char exe[MAX_PATH] = { 0 };
+            GetModuleFileNameA(NULL, exe, MAX_PATH);
+
+            ShellExecuteA(GetConsoleWindow(), "runas", exe, "-no-hosts", nullptr, SW_HIDE);
+        }
+        */
+
         return TRUE;
     }
     return FALSE;
